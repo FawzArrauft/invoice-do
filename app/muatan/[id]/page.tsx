@@ -46,6 +46,10 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
   const [cargoList, setCargoList] = useState<Cargo[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Sorting and Filtering state
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  const [selectedMonth, setSelectedMonth] = useState<string>(""); // Format: YYYY-MM
+
   // Cargo form state
   const [showCargoForm, setShowCargoForm] = useState(false);
   const [editingCargo, setEditingCargo] = useState<Cargo | null>(null);
@@ -228,8 +232,20 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
     setSelectedCargoForResult(null);
   }
 
-  // Calculations for table total (sum of saved totals only)
-  const tableTotal = cargoList.reduce((sum, c) => sum + (c.total || 0), 0);
+  // Filter and Sort Cargo List
+  const filteredAndSortedCargoList = cargoList
+    .filter((c) => {
+      if (!selectedMonth) return true;
+      return c.tanggal.startsWith(selectedMonth);
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.tanggal).getTime();
+      const dateB = new Date(b.tanggal).getTime();
+      return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+    });
+
+  // Calculations for table total (sum of saved totals only) based on filtered list
+  const tableTotal = filteredAndSortedCargoList.reduce((sum, c) => sum + (c.total || 0), 0);
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (!truck) return <div className="p-6">Truck not found</div>;
@@ -263,6 +279,54 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
           >
             Export Excel
           </button>
+        </div>
+      </div>
+
+      {/* Filter and Sort Controls */}
+      <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 bg-zinc-900/40 p-4 rounded-2xl border border-zinc-800">
+        <div>
+          <label className="block text-xs text-zinc-400 mb-1.5 uppercase font-medium tracking-wider">Filter by Month</label>
+          <div className="flex gap-2">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm w-full sm:w-auto text-zinc-200"
+            />
+            {selectedMonth && (
+              <button
+                onClick={() => setSelectedMonth("")}
+                className="text-sm text-zinc-400 hover:text-white underline px-2"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-400 mb-1.5 uppercase font-medium tracking-wider">Sort Order (Date)</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSortOrder("asc")}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm border ${
+                sortOrder === "asc"
+                  ? "bg-amber-500/20 border-amber-500 text-amber-400"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+              }`}
+            >
+              Oldest First (ASC)
+            </button>
+            <button
+              onClick={() => setSortOrder("desc")}
+              className={`flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm border ${
+                sortOrder === "desc"
+                  ? "bg-amber-500/20 border-amber-500 text-amber-400"
+                  : "border-zinc-700 bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+              }`}
+            >
+              Newest First (DESC)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -322,7 +386,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                 value={cargoForm.balen_freight_cost}
                 onChange={(val) => setCargoForm({ ...cargoForm, balen_freight_cost: val })}
               />
-            </div>
+            </div> {selectedMonth ? `(${selectedMonth})` : "(All Time)"}
             <div>
               <label className="mb-2 block text-sm text-zinc-300">Balen Cargo Type</label>
               <input
@@ -401,7 +465,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               </tr>
             </thead>
             <tbody>
-              {cargoList.map((c, i) => (
+              {filteredAndSortedCargoList.map((c, i) => (
                 <tr key={c.id} className="border-t border-zinc-800 hover:bg-zinc-900/50">
                   <td className="px-3 py-3 text-center">{i + 1}</td>
                   <td className="px-3 py-3 text-center">{c.tanggal}</td>
@@ -446,17 +510,19 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                   </td>
                 </tr>
               ))}
-              {cargoList.length === 0 && (
+              {filteredAndSortedCargoList.length === 0 && (
                 <tr>
                   <td colSpan={11} className="px-4 py-6 text-center text-zinc-500">
-                    Belum ada data cargo
+                    {selectedMonth ? "Tidak ada cargo di bulan ini" : "Belum ada data cargo"}
                   </td>
                 </tr>
               )}
               {/* Table Total Row */}
-              {cargoList.length > 0 && (
+              {filteredAndSortedCargoList.length > 0 && (
                 <tr className="bg-zinc-800 border-t-2 border-zinc-600">
-                  <td colSpan={8} className="px-3 py-3 text-right font-bold">TABLE TOTAL:</td>
+                  <td colSpan={8} className="px-3 py-3 text-right font-bold">
+                    TOTAL {selectedMonth ? `(${selectedMonth})` : ""}:
+                  </td>
                   <td className="px-3 py-3 text-center font-bold text-lg text-amber-400">
                     {formatIDR(tableTotal)}
                   </td>

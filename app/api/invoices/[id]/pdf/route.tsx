@@ -50,6 +50,8 @@ export async function GET(
       .eq("invoice_id", id);
 
     const subtotal = items?.reduce((sum, it) => sum + (it.ongkir || 0), 0) || 0;
+    const totalKuli = items?.reduce((sum, it) => sum + (it.kuli || 0), 0) || 0;
+    const grandTotal = subtotal + totalKuli;
 
     const styles = StyleSheet.create({
       page: {
@@ -139,11 +141,12 @@ export async function GET(
       },
       // Column widths - center aligned
       colNopol: { width: "12%", textAlign: "center" },
-      colTujuan: { width: "16%", textAlign: "center" },
-      colJenis: { width: "16%", textAlign: "center" },
-      colOngkir: { width: "15%", textAlign: "center" },
-      colBerat: { width: "10%", textAlign: "center" },
-      colKeterangan: { width: "31%", textAlign: "center" },
+      colTujuan: { width: "20%", textAlign: "center", paddingLeft: 4 },
+      colJenis: { width: "14%", textAlign: "center" },
+      colOngkir: { width: "14%", textAlign: "center" },
+      colKuli: { width: "14%", textAlign: "center", paddingLeft: 4 },
+      colBerat: { width: "12%", textAlign: "center", paddingLeft: 4 },
+      colKeterangan: { width: "16%", textAlign: "center" },
       // Totals section
       totalsContainer: {
         flexDirection: "row",
@@ -198,7 +201,7 @@ export async function GET(
       },
       transferText: {
         fontSize: 10,
-        color: colors.darkGray,
+        color: colors.black,
         marginBottom: 2,
       },
       transferHighlight: {
@@ -213,7 +216,7 @@ export async function GET(
         alignItems: "center",
       },
       signatureLine: {
-        width: 180,
+        width: 120,
         borderBottomWidth: 1,
         borderBottomColor: colors.black,
         marginBottom: 5,
@@ -224,7 +227,7 @@ export async function GET(
       },
       signatureImage: {
         width: 120,
-        height: 50,
+        height: 65,
         marginBottom: 5,
       },
     });
@@ -265,7 +268,8 @@ export async function GET(
             <Text style={[styles.tableHeaderText, styles.colTujuan]}>Tujuan</Text>
             <Text style={[styles.tableHeaderText, styles.colJenis]}>Jenis</Text>
             <Text style={[styles.tableHeaderText, styles.colOngkir]}>Ongkir (RP)</Text>
-            <Text style={[styles.tableHeaderText, styles.colBerat]}>Berat (KG)</Text>
+            <Text style={[styles.tableHeaderText, styles.colKuli]}>Kuli (RP)</Text>
+            <Text style={[styles.tableHeaderText, styles.colBerat]}>Berat</Text>
             <Text style={[styles.tableHeaderText, styles.colKeterangan]}>Keterangan</Text>
           </View>
 
@@ -276,6 +280,7 @@ export async function GET(
               <Text style={styles.colTujuan}>{it.tujuan}</Text>
               <Text style={styles.colJenis}>{it.jenis}</Text>
               <Text style={styles.colOngkir}>{idr(it.ongkir)}</Text>
+              <Text style={styles.colKuli}>{it.kuli ? idr(it.kuli) : "-"}</Text>
               <Text style={styles.colBerat}>{it.berat}</Text>
               <Text style={styles.colKeterangan}>{it.keterangan || ""}</Text>
             </View>
@@ -288,9 +293,15 @@ export async function GET(
                 <Text style={styles.totalLabel}>Subtotal:</Text>
                 <Text style={styles.totalValue}>{idr(subtotal)}</Text>
               </View>
+              {totalKuli > 0 && (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total Kuli:</Text>
+                  <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
+                </View>
+              )}
               <View style={styles.totalRow}>
                 <Text style={styles.amountDueLabel}>Amount Due:</Text>
-                <Text style={styles.amountDueValue}>{idr(subtotal)}</Text>
+                <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
               </View>
               
               {/* Signature directly below Amount Due */}

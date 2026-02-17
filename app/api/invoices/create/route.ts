@@ -8,6 +8,7 @@ const ItemSchema = z.object({
   nopol: z.string().min(1),
   ongkir: z.number().nonnegative(),
   berat: z.number().nonnegative(),
+  kuli: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
 });
 
@@ -36,7 +37,9 @@ export async function POST(req: Request) {
   const sb = supabaseServer();
   const data = parsed.data;
 
-  const total = data.items.reduce((sum, it) => sum + it.ongkir, 0);
+  const totalOngkir = data.items.reduce((sum, it) => sum + it.ongkir, 0);
+  const totalKuli = data.items.reduce((sum, it) => sum + (it.kuli || 0), 0);
+  const grandTotal = totalOngkir + totalKuli;
 
   // insert invoice header first
   const { data: invoice, error: invErr } = await sb
@@ -46,7 +49,7 @@ export async function POST(req: Request) {
       is_manual: !!data.invoiceNumber,
       tanggal: data.tanggal,
       kepada_yth: data.kepadaYth,
-      total_ongkir: total,
+      total_ongkir: grandTotal,
       footer_tanggal: data.footerTanggal,
       bank_name: data.bankName,
       no_rekening: data.noRekening,
@@ -69,6 +72,7 @@ export async function POST(req: Request) {
     nopol: it.nopol,
     ongkir: it.ongkir,
     berat: it.berat,
+    kuli: it.kuli || 0,
     keterangan: it.keterangan,
   }));
 

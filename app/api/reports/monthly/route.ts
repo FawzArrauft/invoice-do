@@ -86,10 +86,10 @@ export async function GET(req: Request) {
 
     // ===== COMPANY AGGREGATION END =====
 
-    const aggregate = (rows: any[], key: string) => {
+    const aggregate = (rows: Array<Record<string, unknown>>, key: string) => {
       const map = new Map<string, number>();
       for (const r of rows) {
-        map.set(r[key], (map.get(r[key]) || 0) + (r.ongkir || 0));
+        map.set(r[key] as string, (map.get(r[key] as string) || 0) + ((r.ongkir as number) || 0));
       }
       return Array.from(map.entries())
         .map(([key, value]) => ({ key, value }))
@@ -103,10 +103,10 @@ export async function GET(req: Request) {
       byNopol: aggregate(items || [], "nopol"),
       byCompany,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Report error:", err);
     return NextResponse.json(
-      { error: err.message || "Failed to generate report" },
+      { error: (err instanceof Error ? err.message : String(err)) || "Failed to generate report" },
       { status: 500 },
     );
   }

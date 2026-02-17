@@ -8,6 +8,7 @@ type Item = {
   jenis: string;
   ongkir: number;
   berat: number;
+  kuli: number;
   keterangan: string;
 };
 
@@ -21,7 +22,7 @@ export default function CreateInvoicePage() {
   const [kepadaYth, setKepadaYth] = useState("");
 
   const [items, setItems] = useState<Item[]>([
-    { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, keterangan: "" },
+    { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "" },
   ]);
 
   const [footerTanggal, setFooterTanggal] = useState(
@@ -68,10 +69,17 @@ export default function CreateInvoicePage() {
     }
   }, [useDefaultSignature, defaultSignatureUrl, defaultSignatureName]);
 
-  const total = useMemo(
+  const totalOngkir = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.ongkir) || 0), 0),
     [items],
   );
+
+  const totalKuli = useMemo(
+    () => items.reduce((sum, it) => sum + (Number(it.kuli) || 0), 0),
+    [items],
+  );
+
+  const total = totalOngkir + totalKuli;
 
   function updateItem(i: number, patch: Partial<Item>) {
     setItems((prev) =>
@@ -82,7 +90,7 @@ export default function CreateInvoicePage() {
   function addRow() {
     setItems((prev) => [
       ...prev,
-      { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, keterangan: "" },
+      { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "" },
     ]);
   }
 
@@ -152,6 +160,7 @@ export default function CreateInvoicePage() {
         jenis: it.jenis || "",
         ongkir: Number(it.ongkir) || 0,
         berat: Number(it.berat) || 0,
+        kuli: Number(it.kuli) || 0,
         keterangan: it.keterangan || "",
       })),
       footerTanggal,
@@ -311,7 +320,19 @@ export default function CreateInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-4">
+                <div className="sm:col-span-2">
+                  <Label>Kuli (IDR)</Label>
+                  <input
+                    inputMode="numeric"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    value={it.kuli}
+                    onChange={(e) =>
+                      updateItem(i, { kuli: Number(e.target.value || 0) })
+                    }
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
                   <Label>Keterangan</Label>
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -338,9 +359,21 @@ export default function CreateInvoicePage() {
           ))}
         </div>
 
-        <div className="mt-4 flex items-center justify-between border-t border-zinc-800 pt-4">
-          <span className="text-sm text-zinc-400">TOTAL ONGKIR</span>
-          <span className="text-lg font-semibold">Rp {formatIDR(total)}</span>
+        <div className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-zinc-400">Total Ongkir</span>
+            <span className="text-sm">Rp {formatIDR(totalOngkir)}</span>
+          </div>
+          {totalKuli > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-zinc-400">Total Kuli</span>
+              <span className="text-sm">Rp {formatIDR(totalKuli)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-zinc-400 font-semibold">GRAND TOTAL</span>
+            <span className="text-lg font-semibold">Rp {formatIDR(total)}</span>
+          </div>
         </div>
       </div>
 
@@ -465,7 +498,7 @@ export default function CreateInvoicePage() {
               </>
             )}
           </div>
-        </div>
+          </div>
 
         <button
           onClick={saveInvoice}

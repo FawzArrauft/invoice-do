@@ -17,6 +17,7 @@ export default function MuatanPage() {
   const [showForm, setShowForm] = useState(false);
   const [nopol, setNopol] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Edit states
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -144,9 +145,14 @@ export default function MuatanPage() {
 
   if (loading) return <div className="p-6">Loading...</div>;
 
+  // Filter trucks based on search query
+  const filteredTrucks = trucks.filter((t) =>
+    t.nopol.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   // Group trucks by status
-  const orderGroup = trucks.filter((t) => t.status === "ordering");
-  const inHomeGroup = trucks.filter((t) => t.status !== "ordering");
+  const orderGroup = filteredTrucks.filter((t) => t.status === "ordering");
+  const inHomeGroup = filteredTrucks.filter((t) => t.status !== "ordering");
 
   // Render truck card content
   const TruckCard = ({
@@ -277,17 +283,44 @@ export default function MuatanPage() {
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Truck Management</h1>
           <p className="text-sm text-zinc-400">Kelola truck dan cargo</p>
         </div>
-        <button
-          onClick={() => setShowForm(!showForm)}
-          className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
-        >
-          + Add Truck
-        </button>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search Nopol..."
+              className="w-full sm:w-64 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 pl-10 text-sm outline-none focus:border-zinc-500 transition-colors"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <svg
+              className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </div>
+
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium whitespace-nowrap"
+          >
+            + Add Truck
+          </button>
+        </div>
       </div>
 
       {/* Add Truck Form */}
