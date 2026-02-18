@@ -16,10 +16,11 @@ import React from "react";
 // Colors matching the design
 const colors = {
   black: "#1a1a1a",
-  gold: "#e6b800",
+  gold: "#f8d237",
   lightGray: "#f5f5f5",
   darkGray: "#333333",
   white: "#ffffff",
+  lightYellow: "#ffe710",
 };
 
 function idr(n: number) {
@@ -58,8 +59,22 @@ export async function GET(
       .select("*")
       .eq("invoice_id", id);
 
-    const subtotal = items?.reduce((sum, it) => sum + (it.ongkir || 0), 0) || 0;
-    const totalKuli = items?.reduce((sum, it) => sum + (it.kuli || 0), 0) || 0;
+    // Sort items by tanggal_item ascending (earlier dates first)
+    const sortedItems =
+      items?.sort((a, b) => {
+        const dateA = a.tanggal_item ? new Date(a.tanggal_item).getTime() : 0;
+        const dateB = b.tanggal_item ? new Date(b.tanggal_item).getTime() : 0;
+        return dateA - dateB;
+      }) || [];
+
+    // Check if there's any murti type item
+    const hasMurtiType =
+      sortedItems?.some((it) => it.type === "murti") || false;
+
+    const subtotal =
+      sortedItems?.reduce((sum, it) => sum + (it.ongkir || 0), 0) || 0;
+    const totalKuli =
+      sortedItems?.reduce((sum, it) => sum + (it.kuli || 0), 0) || 0;
     const grandTotal = subtotal + totalKuli;
 
     const styles = StyleSheet.create({
@@ -71,14 +86,14 @@ export async function GET(
       },
       // Header section
       header: {
-        backgroundColor: colors.black,
+        backgroundColor: colors.white,
         padding: 20,
         marginBottom: 15,
       },
       title: {
         fontSize: 36,
         fontWeight: "bold",
-        color: colors.gold,
+        color: colors.black,
         fontFamily: "Helvetica-Bold",
       },
       // Invoice info row
@@ -86,17 +101,32 @@ export async function GET(
         flexDirection: "row",
         marginBottom: 5,
       },
+
+      infoSection: {
+        flexDirection: "row",
+        gap: 15,
+        marginBottom: 15,
+      },
+
+      infoItem: {
+        flex: 1,
+        flexDirection: "row",
+      },
+
       infoLabel: {
         backgroundColor: colors.gold,
         padding: 6,
         width: 90,
-        fontSize: 9,
+        fontSize: 10,
+        fontFamily: "Helvetica-Bold",
+        color: colors.black,
       },
       infoValue: {
         backgroundColor: colors.lightGray,
         padding: 6,
         width: 120,
-        fontSize: 9,
+        fontSize: 10,
+        color: colors.black,
       },
       // Address section
       addressRow: {
@@ -116,19 +146,19 @@ export async function GET(
       },
       addressText: {
         fontSize: 10,
-        color: colors.darkGray,
-        fontStyle: "italic",
+        color: colors.black,
+        fontFamily: "Helvetica",
       },
       // Table
       tableHeader: {
         flexDirection: "row",
-        backgroundColor: colors.black,
+        backgroundColor: colors.lightYellow,
         paddingVertical: 8,
         paddingHorizontal: 4,
       },
       tableHeaderText: {
-        color: colors.gold,
-        fontSize: 9,
+        color: colors.black,
+        fontSize: 10,
         fontWeight: "bold",
         fontFamily: "Helvetica-Bold",
       },
@@ -157,6 +187,14 @@ export async function GET(
       colKuli: { width: "12%", textAlign: "center", paddingLeft: 4 },
       colBerat: { width: "11%", textAlign: "center", paddingLeft: 4 },
       colKeterangan: { width: "16%", textAlign: "center" },
+      // Column widths for murti (without Jenis)
+      colTanggalMurti: { width: "13%", textAlign: "center" },
+      colNopolMurti: { width: "15%", textAlign: "center", paddingLeft: 6 },
+      colTujuanMurti: { width: "17%", textAlign: "center", paddingLeft: 4 },
+      colOngkirMurti: { width: "15%", textAlign: "center" },
+      colKuliMurti: { width: "14%", textAlign: "center", paddingLeft: 4 },
+      colBeratMurti: { width: "13%", textAlign: "center", paddingLeft: 4 },
+      colKeteranganMurti: { width: "13%", textAlign: "center" },
       // Totals section
       totalsContainer: {
         flexDirection: "row",
@@ -201,7 +239,8 @@ export async function GET(
       },
       // Transfer section
       transferSection: {
-        marginTop: 25,
+        marginTop: 10,
+        paddingBottom: 20,
       },
       transferTitle: {
         fontSize: 11,
@@ -220,6 +259,11 @@ export async function GET(
         fontStyle: "italic",
       },
       // Signature section - below Amount Due
+      signatureIntro: {
+        fontSize: 10,
+        marginBottom: 8,
+        color: colors.black,
+      },
       signatureBox: {
         marginTop: 25,
         width: 200,
@@ -247,54 +291,137 @@ export async function GET(
         <Page size="A4" style={styles.page}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>INVOICE</Text>
+            <Text style={styles.title}>INVOICE HR</Text>
           </View>
 
           {/* Invoice Info */}
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Invoice #:</Text>
-            <Text style={styles.infoValue}>{invoice.invoice_number}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Invoice Date:</Text>
-            <Text style={styles.infoValue}>{formatDateDMY(invoice.tanggal)}</Text>
+          <View style={styles.infoSection}>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Invoice #:</Text>
+              <Text style={styles.infoValue}>{invoice.invoice_number}</Text>
+            </View>
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Invoice Date:</Text>
+              <Text style={styles.infoValue}>
+                {formatDateDMY(invoice.tanggal)}
+              </Text>
+            </View>
           </View>
 
           {/* Address Row */}
           <View style={styles.addressRow}>
             <View style={styles.addressBlock}>
               <Text style={styles.addressTitle}>Kepada Yth</Text>
-              <Text style={styles.addressText}>{invoice.kepada_yth || "Name/Company Name"}</Text>
+              <Text style={styles.addressText}>
+                {invoice.kepada_yth || "Name/Company Name"}
+              </Text>
             </View>
             <View style={styles.addressBlock}>
               <Text style={styles.addressTitle}>Bill From:</Text>
-              <Text style={styles.addressText}>{invoice.bill_from || "HR Ekspedisi"}</Text>
+              <Text style={styles.addressText}>
+                {invoice.bill_from || "HR Ekspedisi"}
+              </Text>
             </View>
           </View>
 
           {/* Table Header */}
           <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, styles.colTanggal]}>Tanggal</Text>
-            <Text style={[styles.tableHeaderText, styles.colNopol]}>Nopol</Text>
-            <Text style={[styles.tableHeaderText, styles.colTujuan]}>Tujuan</Text>
-            <Text style={[styles.tableHeaderText, styles.colJenis]}>Jenis</Text>
-            <Text style={[styles.tableHeaderText, styles.colOngkir]}>Ongkir (RP)</Text>
-            <Text style={[styles.tableHeaderText, styles.colKuli]}>Kuli (RP)</Text>
-            <Text style={[styles.tableHeaderText, styles.colBerat]}>Berat</Text>
-            <Text style={[styles.tableHeaderText, styles.colKeterangan]}>Keterangan</Text>
+            {hasMurtiType ? (
+              <>
+                <Text style={[styles.tableHeaderText, styles.colTanggalMurti]}>
+                  Tanggal
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colNopolMurti]}>
+                  Nopol
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colTujuanMurti]}>
+                  Tujuan
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colOngkirMurti]}>
+                  Biaya Kirim (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colKuliMurti]}>
+                  Kuli (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colBeratMurti]}>
+                  Berat
+                </Text>
+                <Text
+                  style={[styles.tableHeaderText, styles.colKeteranganMurti]}
+                >
+                  Keterangan
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[styles.tableHeaderText, styles.colTanggal]}>
+                  Tanggal
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colNopol]}>
+                  Nopol
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colTujuan]}>
+                  Tujuan
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colJenis]}>
+                  Jenis
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colOngkir]}>
+                  Ongkir (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colKuli]}>
+                  Kuli (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colBerat]}>
+                  Berat
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colKeterangan]}>
+                  Keterangan
+                </Text>
+              </>
+            )}
           </View>
 
           {/* Table Rows */}
-          {items?.map((it, i) => (
-            <View style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt} key={i}>
-              <Text style={styles.colTanggal}>{formatDateDMY(it.tanggal_item)}</Text>
-              <Text style={styles.colNopol}>{it.nopol}</Text>
-              <Text style={styles.colTujuan}>{it.tujuan}</Text>
-              <Text style={styles.colJenis}>{it.jenis}</Text>
-              <Text style={styles.colOngkir}>{idr(it.ongkir)}</Text>
-              <Text style={styles.colKuli}>{it.kuli ? idr(it.kuli) : "-"}</Text>
-              <Text style={styles.colBerat}>{it.berat}</Text>
-              <Text style={styles.colKeterangan}>{it.keterangan || ""}</Text>
+          {sortedItems?.map((it, i) => (
+            <View
+              style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
+              key={i}
+            >
+              {hasMurtiType ? (
+                <>
+                  <Text style={styles.colTanggalMurti}>
+                    {formatDateDMY(it.tanggal_item)}
+                  </Text>
+                  <Text style={styles.colNopolMurti}>{it.nopol}</Text>
+                  <Text style={styles.colTujuanMurti}>{it.tujuan}</Text>
+                  <Text style={styles.colOngkirMurti}>{idr(it.ongkir)}</Text>
+                  <Text style={styles.colKuliMurti}>
+                    {it.kuli ? idr(it.kuli) : "-"}
+                  </Text>
+                  <Text style={styles.colBeratMurti}>{it.berat}</Text>
+                  <Text style={styles.colKeteranganMurti}>
+                    {it.keterangan || ""}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.colTanggal}>
+                    {formatDateDMY(it.tanggal_item)}
+                  </Text>
+                  <Text style={styles.colNopol}>{it.nopol}</Text>
+                  <Text style={styles.colTujuan}>{it.tujuan}</Text>
+                  <Text style={styles.colJenis}>{it.jenis}</Text>
+                  <Text style={styles.colOngkir}>{idr(it.ongkir)}</Text>
+                  <Text style={styles.colKuli}>
+                    {it.kuli ? idr(it.kuli) : "-"}
+                  </Text>
+                  <Text style={styles.colBerat}>{it.berat}</Text>
+                  <Text style={styles.colKeterangan}>
+                    {it.keterangan || ""}
+                  </Text>
+                </>
+              )}
             </View>
           ))}
 
@@ -315,15 +442,21 @@ export async function GET(
                 <Text style={styles.amountDueLabel}>Amount Due:</Text>
                 <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
               </View>
-              
+
               {/* Signature directly below Amount Due */}
               <View style={styles.signatureBox}>
+                <Text style={styles.signatureIntro}>Hormat Kami, </Text>
                 {invoice.signature_url && (
                   // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image doesn't support alt
-                  <Image src={invoice.signature_url} style={styles.signatureImage} />
+                  <Image
+                    src={invoice.signature_url}
+                    style={styles.signatureImage}
+                  />
                 )}
                 <View style={styles.signatureLine} />
-                <Text style={styles.signatureLabel}>{invoice.signature_name || "Signature"}</Text>
+                <Text style={styles.signatureLabel}>
+                  {invoice.signature_name || "Signature"}
+                </Text>
               </View>
             </View>
           </View>
@@ -334,15 +467,23 @@ export async function GET(
             <View style={{ marginTop: 4 }}>
               <View style={{ flexDirection: "row", marginBottom: 2 }}>
                 <Text style={{ ...styles.transferText, width: 80 }}>Bank</Text>
-                <Text style={styles.transferText}>: {invoice.bank_name || "-"}</Text>
+                <Text style={styles.transferText}>
+                  : {invoice.bank_name || "-"}
+                </Text>
               </View>
               <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={{ ...styles.transferText, width: 80 }}>No. Rekening</Text>
-                <Text style={styles.transferText}>: {invoice.no_rekening || "-"}</Text>
+                <Text style={{ ...styles.transferText, width: 80 }}>
+                  No. Rekening
+                </Text>
+                <Text style={styles.transferText}>
+                  : {invoice.no_rekening || "-"}
+                </Text>
               </View>
               <View style={{ flexDirection: "row", marginBottom: 2 }}>
                 <Text style={{ ...styles.transferText, width: 80 }}>A/N</Text>
-                <Text style={styles.transferText}>: {invoice.account_name || "-"}</Text>
+                <Text style={styles.transferText}>
+                  : {invoice.account_name || "-"}
+                </Text>
               </View>
             </View>
           </View>
@@ -360,10 +501,8 @@ export async function GET(
     });
   } catch (err: unknown) {
     console.error(err);
-    const message = err instanceof Error ? err.message : "PDF generation failed";
-    return NextResponse.json(
-      { error: message },
-      { status: 500 },
-    );
+    const message =
+      err instanceof Error ? err.message : "PDF generation failed";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

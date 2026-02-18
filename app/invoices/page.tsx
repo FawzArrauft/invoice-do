@@ -125,6 +125,9 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deletingAll, setDeletingAll] = useState(false);
 
   async function fetchInvoices() {
     try {
@@ -143,6 +146,27 @@ export default function InvoicesPage() {
     fetchInvoices();
   }, []);
 
+  async function handleDeleteAll() {
+    if (deleteConfirmText !== "HAPUS SEMUA") {
+      alert("Ketik 'HAPUS SEMUA' untuk konfirmasi");
+      return;
+    }
+    setDeletingAll(true);
+    try {
+      const res = await fetch("/api/invoices/delete-all?confirm=DELETE_ALL_INVOICES", { method: "DELETE" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Gagal menghapus");
+      alert(`Berhasil menghapus ${json.deletedCount} invoice`);
+      setShowDeleteAllModal(false);
+      setDeleteConfirmText("");
+      fetchInvoices();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Gagal menghapus semua invoice");
+    } finally {
+      setDeletingAll(false);
+    }
+  }
+
   const filteredData = useMemo(() => {
     if (!searchQuery.trim()) return data;
     const query = searchQuery.toLowerCase();
@@ -159,17 +183,68 @@ export default function InvoicesPage() {
 
   return (
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
+      {/* Delete All Confirmation Modal */}
+      {showDeleteAllModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-semibold text-red-400 mb-4">⚠️ Hapus Semua Invoice</h2>
+            <p className="text-zinc-300 mb-4">
+              Tindakan ini akan menghapus <strong>SEMUA invoice</strong> dan tidak dapat dibatalkan.
+              Data yang sudah dihapus tidak bisa dikembalikan.
+            </p>
+            <p className="text-zinc-400 text-sm mb-4">
+              Ketik <strong className="text-red-400">HAPUS SEMUA</strong> untuk konfirmasi:
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Ketik: HAPUS SEMUA"
+              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 mb-4 outline-none focus:border-red-500"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteAllModal(false);
+                  setDeleteConfirmText("");
+                }}
+                className="flex-1 rounded-lg border border-zinc-700 px-4 py-2 hover:bg-zinc-800"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleDeleteAll}
+                disabled={deletingAll || deleteConfirmText !== "HAPUS SEMUA"}
+                className="flex-1 rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingAll ? "Menghapus..." : "Hapus Semua"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Invoices</h1>
           <p className="text-sm text-zinc-400">History (latest 100)</p>
         </div>
-        <Link
-          href="/"
-          className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm"
-        >
-          + New Invoice
-        </Link>
+        <div className="flex gap-2">
+          {data.length > 0 && (
+            <button
+              onClick={() => setShowDeleteAllModal(true)}
+              className="rounded-xl border border-red-800 bg-red-900/30 px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+            >
+              Hapus Semua
+            </button>
+          )}
+          <Link
+            href="/"
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm"
+          >
+            + New Invoice
+          </Link>
+        </div>
       </div>
 
       {/* Search Bar */}

@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+
+type ItemType = "default" | "murti";
 
 type Item = {
   id?: string;
+  type: ItemType;
   nopol: string;
   tujuan: string;
   jenis: string;
@@ -54,6 +57,9 @@ export default function EditInvoicePage() {
   const [signatureUrl, setSignatureUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  // Refs for auto-scroll
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
   useEffect(() => {
     async function loadInvoice() {
       try {
@@ -76,6 +82,7 @@ export default function EditInvoicePage() {
           inv.items?.length > 0
             ? inv.items.map((it) => ({
                 id: it.id,
+                type: (it.type as ItemType) || "default",
                 nopol: it.nopol || "",
                 tujuan: it.tujuan || "",
                 jenis: it.jenis || "",
@@ -85,7 +92,7 @@ export default function EditInvoicePage() {
                 keterangan: it.keterangan || "",
                 tanggal_item: it.tanggal_item || "",
               }))
-            : [{ nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: "" }]
+            : [{ type: "default" as ItemType, nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: "" }]
         );
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Error loading invoice");
@@ -98,6 +105,17 @@ export default function EditInvoicePage() {
       loadInvoice();
     }
   }, [invoiceId]);
+
+  // Sort items by tanggal_item for display (earlier dates first)
+  const sortedItemsWithIndex = useMemo(() => {
+    return items
+      .map((item, originalIndex) => ({ item, originalIndex }))
+      .sort((a, b) => {
+        const dateA = a.item.tanggal_item ? new Date(a.item.tanggal_item).getTime() : 0;
+        const dateB = b.item.tanggal_item ? new Date(b.item.tanggal_item).getTime() : 0;
+        return dateA - dateB;
+      });
+  }, [items]);
 
   const totalOngkir = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.ongkir) || 0), 0),
@@ -120,8 +138,16 @@ export default function EditInvoicePage() {
   function addRow() {
     setItems((prev) => [
       ...prev,
-      { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
     ]);
+    // Auto-scroll to newly added item after render
+    setTimeout(() => {
+      const lastIndex = items.length;
+      const lastRef = itemRefs.current[lastIndex];
+      if (lastRef) {
+        lastRef.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
   }
 
   function removeRow(i: number) {
@@ -154,6 +180,7 @@ export default function EditInvoicePage() {
       kepadaYth,
       items: items.map((it) => ({
         id: it.id,
+        type: it.type || "default",
         nopol: it.nopol || "",
         tujuan: it.tujuan || "",
         jenis: it.jenis || "",
@@ -174,10 +201,6 @@ export default function EditInvoicePage() {
     for (const [index, it] of items.entries()) {
       if (!it.tujuan.trim()) {
         alert(`Row ${index + 1}: Tujuan wajib diisi`);
-        return;
-      }
-      if (!it.jenis.trim()) {
-        alert(`Row ${index + 1}: Jenis wajib diisi`);
         return;
       }
       if (!it.nopol.trim()) {
@@ -270,12 +293,28 @@ export default function EditInvoicePage() {
         </div>
 
         <div className="space-y-3">
-          {items.map((it, i) => (
+          {sortedItemsWithIndex.map(({ item: it, originalIndex: i }, displayIndex) => (
             <div
               key={i}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-3 sm:p-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                {/* Type Selector */}
+                <div className="sm:col-span-2">
+                  <Label>Tipe</Label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    value={it.type}
+                    onChange={(e) =>
+                      updateItem(i, { type: e.target.value as ItemType })
+                    }
+                  >
+                    <option value="default">Default</option>
+                    <option value="murti">Murti</option>
+                  </select>
+                </div>
+
                 <div className="sm:col-span-2">
                   <Label>Tanggal</Label>
                   <input
@@ -306,17 +345,20 @@ export default function EditInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <Label>Jenis *</Label>
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
-                    value={it.jenis}
-                    onChange={(e) => updateItem(i, { jenis: e.target.value })}
-                  />
-                </div>
+                {/* Jenis - Only show for Default type */}
+                {it.type === "default" && (
+                  <div className="sm:col-span-2">
+                    <Label>Jenis</Label>
+                    <input
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                      value={it.jenis}
+                      onChange={(e) => updateItem(i, { jenis: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
-                  <Label>Ongkir (IDR)</Label>
+                  <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : "Ongkir (IDR)"}</Label>
                   <input
                     inputMode="numeric"
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -327,17 +369,20 @@ export default function EditInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <Label>Berat</Label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    value={it.berat}
-                    onChange={(e) =>
-                      updateItem(i, { berat: Number(e.target.value || 0) })
-                    }
-                  />
-                </div>
+                {/* Berat - Show for Default type (before Kuli) */}
+                {it.type === "default" && (
+                  <div className="sm:col-span-2">
+                    <Label>Berat</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.berat}
+                      onChange={(e) =>
+                        updateItem(i, { berat: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
                   <Label>Kuli (IDR)</Label>
@@ -350,6 +395,21 @@ export default function EditInvoicePage() {
                     }
                   />
                 </div>
+
+                {/* Berat - Show for Murti type (after Kuli) */}
+                {it.type === "murti" && (
+                  <div className="sm:col-span-2">
+                    <Label>Berat</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.berat}
+                      onChange={(e) =>
+                        updateItem(i, { berat: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
                   <Label>Keterangan</Label>
@@ -364,7 +424,7 @@ export default function EditInvoicePage() {
 
                 <div className="sm:col-span-2 flex sm:flex-col items-center justify-between gap-5">
                   <span className="text-xs text-zinc-400 sm:mt-7">
-                    Row {i + 1}
+                    Row {displayIndex + 1}
                   </span>
                   <button
                     onClick={() => removeRow(i)}

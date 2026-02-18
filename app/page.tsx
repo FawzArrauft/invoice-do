@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
+
+type ItemType = "default" | "murti";
 
 type Item = {
+  type: ItemType;
   nopol: string;
   tujuan: string;
   jenis: string;
@@ -23,8 +26,11 @@ export default function CreateInvoicePage() {
   const [kepadaYth, setKepadaYth] = useState("");
 
   const [items, setItems] = useState<Item[]>([
-    { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+    { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
   ]);
+
+  // Refs for auto-scroll
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const [footerTanggal, setFooterTanggal] = useState(
     new Date().toISOString().slice(0, 10),
@@ -39,6 +45,16 @@ export default function CreateInvoicePage() {
   const [defaultSignatureUrl, setDefaultSignatureUrl] = useState("");
   const [defaultSignatureName, setDefaultSignatureName] = useState("");
   const [savingDefault, setSavingDefault] = useState(false);
+
+  // Bank dropdown state
+  const [bankList, setBankList] = useState<Array<{ id: string; name: string; noRekening: string; accountName: string }>>([]);
+  const [loadingBanks, setLoadingBanks] = useState(false);
+  const [selectedBankId, setSelectedBankId] = useState("");
+  const [showAddBank, setShowAddBank] = useState(false);
+  const [newBankName, setNewBankName] = useState("");
+  const [newNoRekening, setNewNoRekening] = useState("");
+  const [newAccountName, setNewAccountName] = useState("");
+  const [savingBank, setSavingBank] = useState(false);
 
   // Load default signature on mount
   useEffect(() => {
@@ -62,6 +78,92 @@ export default function CreateInvoicePage() {
     loadSettings();
   }, []);
 
+  // Load bank accounts on mount
+  useEffect(() => {
+    async function loadBanks() {
+      setLoadingBanks(true);
+      try {
+        const res = await fetch("/api/settings/banks");
+        const json = await res.json();
+        if (json.data) {
+          setBankList(json.data);
+          // Auto-select first bank if available
+          if (json.data.length > 0 && !selectedBankId) {
+            const firstBank = json.data[0];
+            setSelectedBankId(firstBank.id);
+            setBankName(firstBank.name);
+            setNoRekening(firstBank.noRekening);
+            setNamaRekening(firstBank.accountName);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load banks:", err);
+      } finally {
+        setLoadingBanks(false);
+      }
+    }
+    loadBanks();
+  }, []);
+
+  // Handle bank selection
+  function handleBankChange(bankId: string) {
+    setSelectedBankId(bankId);
+    const selected = bankList.find(b => b.id === bankId);
+    if (selected) {
+      setBankName(selected.name);
+      setNoRekening(selected.noRekening);
+      setNamaRekening(selected.accountName);
+    } else {
+      // Custom / manual entry
+      setBankName("");
+      setNoRekening("");
+      setNamaRekening("");
+    }
+  }
+
+  // Save new bank account
+  async function saveNewBank() {
+    if (!newBankName.trim() || !newNoRekening.trim() || !newAccountName.trim()) {
+      alert("Semua field bank wajib diisi");
+      return;
+    }
+    setSavingBank(true);
+    try {
+      const res = await fetch("/api/settings/banks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newBankName,
+          noRekening: newNoRekening,
+          accountName: newAccountName,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Failed");
+      
+      // Add to list and select it
+      const newBank = json.data;
+      setBankList(prev => [newBank, ...prev]);
+      setSelectedBankId(newBank.id);
+      setBankName(newBank.name);
+      setNoRekening(newBank.noRekening);
+      setNamaRekening(newBank.accountName);
+      
+      // Reset form
+      setNewBankName("");
+      setNewNoRekening("");
+      setNewAccountName("");
+      setShowAddBank(false);
+      
+      alert("Bank berhasil disimpan!");
+    } catch (err) {
+      console.error(err);
+      alert("Gagal menyimpan bank");
+    } finally {
+      setSavingBank(false);
+    }
+  }
+
   // Sync signature berdasarkan toggle
   useEffect(() => {
     if (useDefaultSignature && defaultSignatureUrl) {
@@ -69,6 +171,17 @@ export default function CreateInvoicePage() {
       setSignatureName(defaultSignatureName);
     }
   }, [useDefaultSignature, defaultSignatureUrl, defaultSignatureName]);
+
+  // Sort items by tanggal_item for display (earlier dates first)
+  const sortedItemsWithIndex = useMemo(() => {
+    return items
+      .map((item, originalIndex) => ({ item, originalIndex }))
+      .sort((a, b) => {
+        const dateA = a.item.tanggal_item ? new Date(a.item.tanggal_item).getTime() : 0;
+        const dateB = b.item.tanggal_item ? new Date(b.item.tanggal_item).getTime() : 0;
+        return dateA - dateB;
+      });
+  }, [items]);
 
   const totalOngkir = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.ongkir) || 0), 0),
@@ -91,8 +204,16 @@ export default function CreateInvoicePage() {
   function addRow() {
     setItems((prev) => [
       ...prev,
-      { nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
     ]);
+    // Auto-scroll to newly added item after render
+    setTimeout(() => {
+      const lastIndex = items.length; // This will be the new item's index
+      const lastRef = itemRefs.current[lastIndex];
+      if (lastRef) {
+        lastRef.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 100);
   }
 
   function removeRow(i: number) {
@@ -101,6 +222,7 @@ export default function CreateInvoicePage() {
     );
   }
 
+  
   async function uploadSignature(file: File) {
     setUploading(true);
     try {
@@ -156,6 +278,7 @@ export default function CreateInvoicePage() {
       tanggal,
       kepadaYth,
       items: items.map((it) => ({
+        type: it.type || "default",
         nopol: it.nopol || "",
         tujuan: it.tujuan || "",
         jenis: it.jenis || "",
@@ -178,10 +301,7 @@ export default function CreateInvoicePage() {
         alert(`Row ${index + 1}: Tujuan wajib diisi`);
         return;
       }
-      if (!it.jenis.trim()) {
-        alert(`Row ${index + 1}: Jenis wajib diisi`);
-        return;
-      }
+      // Jenis only required for default type
       if (!it.nopol.trim()) {
         alert(`Row ${index + 1}: NoPol wajib diisi`);
         return;
@@ -265,12 +385,28 @@ export default function CreateInvoicePage() {
         </div>
 
         <div className="space-y-3">
-          {items.map((it, i) => (
+          {sortedItemsWithIndex.map(({ item: it, originalIndex: i }, displayIndex) => (
             <div
               key={i}
+              ref={(el) => { itemRefs.current[i] = el; }}
               className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-3 sm:p-4"
             >
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
+                {/* Type Selector */}
+                <div className="sm:col-span-2">
+                  <Label>Tipe</Label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    value={it.type}
+                    onChange={(e) =>
+                      updateItem(i, { type: e.target.value as ItemType })
+                    }
+                  >
+                    <option value="default">Default</option>
+                    <option value="murti">Murti</option>
+                  </select>
+                </div>
+
                 <div className="sm:col-span-2">
                   <Label>Tanggal</Label>
                   <input
@@ -301,17 +437,20 @@ export default function CreateInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <Label>Jenis *</Label>
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
-                    value={it.jenis}
-                    onChange={(e) => updateItem(i, { jenis: e.target.value })}
-                  />
-                </div>
+                {/* Jenis - Only show for Default type */}
+                {it.type === "default" && (
+                  <div className="sm:col-span-2">
+                    <Label>Jenis *</Label>
+                    <input
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                      value={it.jenis}
+                      onChange={(e) => updateItem(i, { jenis: e.target.value })}
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
-                  <Label>Ongkir (IDR)</Label>
+                  <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : "Ongkir (IDR)"}</Label>
                   <input
                     inputMode="numeric"
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -322,17 +461,20 @@ export default function CreateInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
-                  <Label>Berat</Label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    value={it.berat}
-                    onChange={(e) =>
-                      updateItem(i, { berat: Number(e.target.value || 0) })
-                    }
-                  />
-                </div>
+                {/* Berat - Show for Default type (before Kuli) */}
+                {it.type === "default" && (
+                  <div className="sm:col-span-2">
+                    <Label>Berat</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.berat}
+                      onChange={(e) =>
+                        updateItem(i, { berat: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
                   <Label>Kuli (IDR)</Label>
@@ -345,6 +487,21 @@ export default function CreateInvoicePage() {
                     }
                   />
                 </div>
+
+                {/* Berat - Show for Murti type (after Kuli) */}
+                {it.type === "murti" && (
+                  <div className="sm:col-span-2">
+                    <Label>Berat</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.berat}
+                      onChange={(e) =>
+                        updateItem(i, { berat: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
 
                 <div className="sm:col-span-2">
                   <Label>Keterangan</Label>
@@ -359,7 +516,7 @@ export default function CreateInvoicePage() {
 
                 <div className="sm:col-span-2 flex sm:flex-col items-center justify-between gap-5">
                   <span className="text-xs text-zinc-400 sm:mt-7">
-                    Row {i + 1}
+                    Row {displayIndex + 1}
                   </span>
                   <button
                     onClick={() => removeRow(i)}
@@ -406,29 +563,80 @@ export default function CreateInvoicePage() {
           </Field>
 
           <Field label="Nama Bank">
-            <input
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-              placeholder="BCA"
-              value={bankName}
-              onChange={(e) => setBankName(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <select
+                className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                value={selectedBankId}
+                onChange={(e) => handleBankChange(e.target.value)}
+                disabled={loadingBanks}
+              >
+                <option value="">-- Pilih Bank --</option>
+                {bankList.map((bank) => (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.name} - ****{bank.noRekening.slice(-4)}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowAddBank(!showAddBank)}
+                className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              >
+                {showAddBank ? "×" : "+"}
+              </button>
+            </div>
           </Field>
+
+          {/* Add New Bank Form */}
+          {showAddBank && (
+            <div className="sm:col-span-2 rounded-xl border border-zinc-700 bg-zinc-900/50 p-4 space-y-3">
+              <h3 className="text-sm font-medium text-zinc-300">Tambah Bank Baru (Terenkripsi)</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  placeholder="Nama Bank (BCA, Mandiri, dll)"
+                  value={newBankName}
+                  onChange={(e) => setNewBankName(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  placeholder="No Rekening"
+                  value={newNoRekening}
+                  onChange={(e) => setNewNoRekening(e.target.value)}
+                />
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  placeholder="Nama Pemilik Rekening"
+                  value={newAccountName}
+                  onChange={(e) => setNewAccountName(e.target.value)}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={saveNewBank}
+                disabled={savingBank}
+                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {savingBank ? "Menyimpan..." : "Simpan Bank (Encrypted)"}
+              </button>
+            </div>
+          )}
 
           <Field label="No Rekening">
             <input
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-              placeholder="1234567890"
+              readOnly
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 opacity-70"
+              placeholder="Pilih bank dari dropdown"
               value={noRekening}
-              onChange={(e) => setNoRekening(e.target.value)}
             />
           </Field>
 
           <Field label="Nama Rekening (A/N)">
             <input
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-              placeholder="Nama Pemilik Rekening"
+              readOnly
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 opacity-70"
+              placeholder="Pilih bank dari dropdown"
               value={namaRekening}
-              onChange={(e) => setNamaRekening(e.target.value)}
             />
           </Field>
 

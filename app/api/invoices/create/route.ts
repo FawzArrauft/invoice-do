@@ -3,11 +3,12 @@ import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
 const ItemSchema = z.object({
+  type: z.enum(["default", "murti"]).optional().default("default"),
   tujuan: z.string().min(1),
-  jenis: z.string().min(1),
+  jenis: z.string().optional().default(""),
   nopol: z.string().min(1),
   ongkir: z.number().nonnegative(),
-  berat: z.number().nonnegative(),
+  berat: z.number().nonnegative().optional().default(0),
   kuli: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
   tanggal_item: z.string().optional().default(""),
@@ -68,11 +69,12 @@ export async function POST(req: Request) {
   // insert invoice items
   const itemsToInsert = data.items.map((it) => ({
     invoice_id: invoice.id,
+    type: it.type || "default",
     tujuan: it.tujuan,
-    jenis: it.jenis,
+    jenis: it.jenis || "",
     nopol: it.nopol,
     ongkir: it.ongkir,
-    berat: it.berat,
+    berat: it.berat || 0,
     kuli: it.kuli || 0,
     keterangan: it.keterangan,
     tanggal_item: it.tanggal_item || null,

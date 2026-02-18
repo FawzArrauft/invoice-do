@@ -4,11 +4,12 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 const ItemSchema = z.object({
   id: z.string().optional(),
+  type: z.enum(["default", "murti"]).optional().default("default"),
   tujuan: z.string().min(1),
-  jenis: z.string().min(1),
+  jenis: z.string().optional().default(""),
   nopol: z.string().min(1),
   ongkir: z.number().nonnegative(),
-  berat: z.number().nonnegative(),
+  berat: z.number().nonnegative().optional().default(0),
   kuli: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
   tanggal_item: z.string().optional().default(""),
@@ -48,14 +49,20 @@ export async function GET(
     const { data: items, error: itemsError } = await sb
       .from("invoice_items")
       .select("*")
-      .eq("invoice_id", id)
-      .order("id", { ascending: true });
+      .eq("invoice_id", id);
 
     if (itemsError) {
       return NextResponse.json({ error: itemsError.message }, { status: 400 });
     }
 
-    return NextResponse.json({ data: { ...invoice, items: items || [] } });
+    // Sort items by tanggal_item ascending (earlier dates first)
+    const sortedItems = items?.sort((a, b) => {
+      const dateA = a.tanggal_item ? new Date(a.tanggal_item).getTime() : 0;
+      const dateB = b.tanggal_item ? new Date(b.tanggal_item).getTime() : 0;
+      return dateA - dateB;
+    }) || [];
+
+    return NextResponse.json({ data: { ...invoice, items: sortedItems } });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Get failed";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -117,11 +124,12 @@ export async function PUT(
 
     const itemsToInsert = data.items.map((it) => ({
       invoice_id: id,
+      type: it.type || "default",
       tujuan: it.tujuan,
-      jenis: it.jenis,
+      jenis: it.jenis || "",
       nopol: it.nopol,
       ongkir: it.ongkir,
-      berat: it.berat,
+      berat: it.berat || 0,
       kuli: it.kuli || 0,
       keterangan: it.keterangan,
       tanggal_item: it.tanggal_item || null,
