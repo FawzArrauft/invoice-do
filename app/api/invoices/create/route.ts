@@ -10,6 +10,7 @@ const ItemSchema = z.object({
   berat: z.number().nonnegative(),
   kuli: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
+  tanggal_item: z.string().optional().default(""),
 });
 
 const BodySchema = z.object({
@@ -74,6 +75,7 @@ export async function POST(req: Request) {
     berat: it.berat,
     kuli: it.kuli || 0,
     keterangan: it.keterangan,
+    tanggal_item: it.tanggal_item || null,
   }));
 
   const { error: itemErr } = await sb

@@ -26,6 +26,15 @@ function idr(n: number) {
   return "Rp " + new Intl.NumberFormat("id-ID").format(n || 0);
 }
 
+function formatDateDMY(dateStr: string | null | undefined): string {
+  if (!dateStr) return "-";
+  const parts = dateStr.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}-${parts[1]}-${parts[0]}`;
+  }
+  return dateStr;
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -127,25 +136,26 @@ export async function GET(
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 8,
-        paddingHorizontal: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 6,
         backgroundColor: colors.lightGray,
       },
       tableRowAlt: {
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 8,
-        paddingHorizontal: 4,
+        paddingVertical: 10,
+        paddingHorizontal: 6,
         backgroundColor: colors.white,
       },
       // Column widths - center aligned
-      colNopol: { width: "12%", textAlign: "center" },
-      colTujuan: { width: "20%", textAlign: "center", paddingLeft: 4 },
-      colJenis: { width: "14%", textAlign: "center" },
-      colOngkir: { width: "14%", textAlign: "center" },
-      colKuli: { width: "14%", textAlign: "center", paddingLeft: 4 },
-      colBerat: { width: "12%", textAlign: "center", paddingLeft: 4 },
+      colTanggal: { width: "11%", textAlign: "center" },
+      colNopol: { width: "13%", textAlign: "center", paddingLeft: 6 },
+      colTujuan: { width: "15%", textAlign: "center", paddingLeft: 4 },
+      colJenis: { width: "13%", textAlign: "center" },
+      colOngkir: { width: "13%", textAlign: "center" },
+      colKuli: { width: "12%", textAlign: "center", paddingLeft: 4 },
+      colBerat: { width: "11%", textAlign: "center", paddingLeft: 4 },
       colKeterangan: { width: "16%", textAlign: "center" },
       // Totals section
       totalsContainer: {
@@ -247,7 +257,7 @@ export async function GET(
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Invoice Date:</Text>
-            <Text style={styles.infoValue}>{invoice.tanggal}</Text>
+            <Text style={styles.infoValue}>{formatDateDMY(invoice.tanggal)}</Text>
           </View>
 
           {/* Address Row */}
@@ -264,6 +274,7 @@ export async function GET(
 
           {/* Table Header */}
           <View style={styles.tableHeader}>
+            <Text style={[styles.tableHeaderText, styles.colTanggal]}>Tanggal</Text>
             <Text style={[styles.tableHeaderText, styles.colNopol]}>Nopol</Text>
             <Text style={[styles.tableHeaderText, styles.colTujuan]}>Tujuan</Text>
             <Text style={[styles.tableHeaderText, styles.colJenis]}>Jenis</Text>
@@ -276,6 +287,7 @@ export async function GET(
           {/* Table Rows */}
           {items?.map((it, i) => (
             <View style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt} key={i}>
+              <Text style={styles.colTanggal}>{formatDateDMY(it.tanggal_item)}</Text>
               <Text style={styles.colNopol}>{it.nopol}</Text>
               <Text style={styles.colTujuan}>{it.tujuan}</Text>
               <Text style={styles.colJenis}>{it.jenis}</Text>
