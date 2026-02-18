@@ -79,7 +79,7 @@ export async function GET(
 
     const styles = StyleSheet.create({
       page: {
-        padding: 40,
+        padding: 30,
         fontSize: 10,
         fontFamily: "Helvetica",
         backgroundColor: colors.white,
@@ -87,8 +87,8 @@ export async function GET(
       // Header section
       header: {
         backgroundColor: colors.white,
-        padding: 20,
-        marginBottom: 15,
+        padding: 10,
+        marginBottom: 8,
       },
       title: {
         fontSize: 36,
@@ -132,8 +132,8 @@ export async function GET(
       addressRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 20,
-        marginBottom: 25,
+        marginTop: 10,
+        marginBottom: 15,
       },
       addressBlock: {
         width: "45%",
@@ -166,7 +166,7 @@ export async function GET(
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 10,
+        paddingVertical: 8,
         paddingHorizontal: 6,
         backgroundColor: colors.lightGray,
       },
@@ -174,7 +174,7 @@ export async function GET(
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 10,
+        paddingVertical: 8,
         paddingHorizontal: 6,
         backgroundColor: colors.white,
       },
@@ -239,8 +239,8 @@ export async function GET(
       },
       // Transfer section
       transferSection: {
-        marginTop: 10,
-        paddingBottom: 20,
+        marginTop: 5,
+        paddingBottom: 50,
       },
       transferTitle: {
         fontSize: 11,
@@ -325,7 +325,7 @@ export async function GET(
           </View>
 
           {/* Table Header */}
-          <View style={styles.tableHeader}>
+          <View style={styles.tableHeader} fixed>
             {hasMurtiType ? (
               <>
                 <Text style={[styles.tableHeaderText, styles.colTanggalMurti]}>
@@ -387,6 +387,7 @@ export async function GET(
             <View
               style={i % 2 === 0 ? styles.tableRow : styles.tableRowAlt}
               key={i}
+              wrap={false}
             >
               {hasMurtiType ? (
                 <>
@@ -426,64 +427,68 @@ export async function GET(
           ))}
 
           {/* Totals and Signature - Right Side */}
-          <View style={styles.totalsContainer}>
-            <View style={styles.totalsBox}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Subtotal:</Text>
-                <Text style={styles.totalValue}>{idr(subtotal)}</Text>
-              </View>
-              {totalKuli > 0 && (
+          {/* Wrap totals and transfer in a container that doesn't split */}
+          <View wrap={false}>
+            {/* Totals and Signature - Right Side */}
+            <View style={styles.totalsContainer}>
+              <View style={styles.totalsBox}>
                 <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Total Kuli:</Text>
-                  <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
+                  <Text style={styles.totalLabel}>Subtotal:</Text>
+                  <Text style={styles.totalValue}>{idr(subtotal)}</Text>
                 </View>
-              )}
-              <View style={styles.totalRow}>
-                <Text style={styles.amountDueLabel}>Amount Due:</Text>
-                <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
-              </View>
-
-              {/* Signature directly below Amount Due */}
-              <View style={styles.signatureBox}>
-                <Text style={styles.signatureIntro}>Hormat Kami, </Text>
-                {invoice.signature_url && (
-                  // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image doesn't support alt
-                  <Image
-                    src={invoice.signature_url}
-                    style={styles.signatureImage}
-                  />
+                {totalKuli > 0 && (
+                  <View style={styles.totalRow}>
+                    <Text style={styles.totalLabel}>Total Kuli:</Text>
+                    <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
+                  </View>
                 )}
-                <View style={styles.signatureLine} />
-                <Text style={styles.signatureLabel}>
-                  {invoice.signature_name || "Signature"}
-                </Text>
+                <View style={styles.totalRow}>
+                  <Text style={styles.amountDueLabel}>Amount Due:</Text>
+                  <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
+                </View>
+
+                {/* Signature directly below Amount Due */}
+                <View style={styles.signatureBox}>
+                  <Text style={styles.signatureIntro}>Hormat Kami, </Text>
+                  {invoice.signature_url && (
+                    // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image doesn't support alt
+                    <Image
+                      src={invoice.signature_url}
+                      style={styles.signatureImage}
+                    />
+                  )}
+                  <View style={styles.signatureLine} />
+                  <Text style={styles.signatureLabel}>
+                    {invoice.signature_name || "Signature"}
+                  </Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Transfer Section */}
-          <View style={styles.transferSection}>
-            <Text style={styles.transferTitle}>Transfer Ke:</Text>
-            <View style={{ marginTop: 4 }}>
-              <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={{ ...styles.transferText, width: 80 }}>Bank</Text>
-                <Text style={styles.transferText}>
-                  : {invoice.bank_name || "-"}
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={{ ...styles.transferText, width: 80 }}>
-                  No. Rekening
-                </Text>
-                <Text style={styles.transferText}>
-                  : {invoice.no_rekening || "-"}
-                </Text>
-              </View>
-              <View style={{ flexDirection: "row", marginBottom: 2 }}>
-                <Text style={{ ...styles.transferText, width: 80 }}>A/N</Text>
-                <Text style={styles.transferText}>
-                  : {invoice.account_name || "-"}
-                </Text>
+            {/* Transfer Section */}
+            <View style={styles.transferSection}>
+              <Text style={styles.transferTitle}>Transfer Ke:</Text>
+              <View style={{ marginTop: 4 }}>
+                <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                  <Text style={{ ...styles.transferText, width: 80 }}>Bank</Text>
+                  <Text style={styles.transferText}>
+                    : {invoice.bank_name || "-"}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                  <Text style={{ ...styles.transferText, width: 80 }}>
+                    No. Rekening
+                  </Text>
+                  <Text style={styles.transferText}>
+                    : {invoice.no_rekening || "-"}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: "row", marginBottom: 2 }}>
+                  <Text style={{ ...styles.transferText, width: 80 }}>A/N</Text>
+                  <Text style={styles.transferText}>
+                    : {invoice.account_name || "-"}
+                  </Text>
+                </View>
               </View>
             </View>
           </View>
