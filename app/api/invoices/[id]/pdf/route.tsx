@@ -79,7 +79,7 @@ export async function GET(
 
     const styles = StyleSheet.create({
       page: {
-        padding: 30,
+        padding: 25,
         fontSize: 10,
         fontFamily: "Helvetica",
         backgroundColor: colors.white,
@@ -87,11 +87,11 @@ export async function GET(
       // Header section
       header: {
         backgroundColor: colors.white,
-        padding: 10,
-        marginBottom: 8,
+        padding: 6,
+        marginBottom: 4,
       },
       title: {
-        fontSize: 36,
+        fontSize: 28,
         fontWeight: "bold",
         color: colors.black,
         fontFamily: "Helvetica-Bold",
@@ -104,8 +104,8 @@ export async function GET(
 
       infoSection: {
         flexDirection: "row",
-        gap: 15,
-        marginBottom: 15,
+        gap: 10,
+        marginBottom: 6,
       },
 
       infoItem: {
@@ -132,8 +132,8 @@ export async function GET(
       addressRow: {
         flexDirection: "row",
         justifyContent: "space-between",
-        marginTop: 10,
-        marginBottom: 15,
+        marginTop: 6,
+        marginBottom: 8,
       },
       addressBlock: {
         width: "45%",
@@ -153,7 +153,7 @@ export async function GET(
       tableHeader: {
         flexDirection: "row",
         backgroundColor: colors.lightYellow,
-        paddingVertical: 8,
+        paddingVertical: 5,
         paddingHorizontal: 4,
       },
       tableHeaderText: {
@@ -166,16 +166,16 @@ export async function GET(
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 8,
-        paddingHorizontal: 6,
+        paddingVertical: 4,
+        paddingHorizontal: 4,
         backgroundColor: colors.lightGray,
       },
       tableRowAlt: {
         flexDirection: "row",
         borderBottomWidth: 0.5,
         borderBottomColor: "#dddddd",
-        paddingVertical: 8,
-        paddingHorizontal: 6,
+        paddingVertical: 4,
+        paddingHorizontal: 4,
         backgroundColor: colors.white,
       },
       // Column widths - center aligned
@@ -195,11 +195,12 @@ export async function GET(
       colKuliMurti: { width: "14%", textAlign: "center", paddingLeft: 4 },
       colBeratMurti: { width: "13%", textAlign: "center", paddingLeft: 4 },
       colKeteranganMurti: { width: "13%", textAlign: "center" },
-      // Totals section
-      totalsContainer: {
+      // Bottom section (transfer + totals side by side)
+      bottomContainer: {
         flexDirection: "row",
-        justifyContent: "flex-end",
-        marginTop: 20,
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        marginTop: 10,
       },
       totalsBox: {
         width: 200,
@@ -239,8 +240,8 @@ export async function GET(
       },
       // Transfer section
       transferSection: {
-        marginTop: 5,
-        paddingBottom: 50,
+        flex: 1,
+        marginRight: 20,
       },
       transferTitle: {
         fontSize: 11,
@@ -265,7 +266,7 @@ export async function GET(
         color: colors.black,
       },
       signatureBox: {
-        marginTop: 25,
+        marginTop: 15,
         width: 200,
         alignItems: "center",
       },
@@ -426,46 +427,10 @@ export async function GET(
             </View>
           ))}
 
-          {/* Totals and Signature - Right Side */}
-          {/* Wrap totals and transfer in a container that doesn't split */}
-          <View wrap={false}>
-            {/* Totals and Signature - Right Side */}
-            <View style={styles.totalsContainer}>
-              <View style={styles.totalsBox}>
-                <View style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>Subtotal:</Text>
-                  <Text style={styles.totalValue}>{idr(subtotal)}</Text>
-                </View>
-                {totalKuli > 0 && (
-                  <View style={styles.totalRow}>
-                    <Text style={styles.totalLabel}>Total Kuli:</Text>
-                    <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
-                  </View>
-                )}
-                <View style={styles.totalRow}>
-                  <Text style={styles.amountDueLabel}>Amount Due:</Text>
-                  <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
-                </View>
+          {/* Bottom Section: Transfer (kiri) + Totals & Signature (kanan) */}
+          <View wrap={false} style={styles.bottomContainer}>
 
-                {/* Signature directly below Amount Due */}
-                <View style={styles.signatureBox}>
-                  <Text style={styles.signatureIntro}>Hormat Kami, </Text>
-                  {invoice.signature_url && (
-                    // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image doesn't support alt
-                    <Image
-                      src={invoice.signature_url}
-                      style={styles.signatureImage}
-                    />
-                  )}
-                  <View style={styles.signatureLine} />
-                  <Text style={styles.signatureLabel}>
-                    {invoice.signature_name || "Signature"}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            {/* Transfer Section */}
+            {/* Transfer Section - Kiri */}
             <View style={styles.transferSection}>
               <Text style={styles.transferTitle}>Transfer Ke:</Text>
               <View style={{ marginTop: 4 }}>
@@ -491,6 +456,41 @@ export async function GET(
                 </View>
               </View>
             </View>
+
+            {/* Totals & Signature - Kanan */}
+            <View style={styles.totalsBox}>
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Subtotal:</Text>
+                <Text style={styles.totalValue}>{idr(subtotal)}</Text>
+              </View>
+              {totalKuli > 0 && (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total Kuli:</Text>
+                  <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
+                </View>
+              )}
+              <View style={styles.totalRow}>
+                <Text style={styles.amountDueLabel}>Amount Due:</Text>
+                <Text style={styles.amountDueValue}>{idr(grandTotal)}</Text>
+              </View>
+
+              {/* Signature */}
+              <View style={styles.signatureBox}>
+                <Text style={styles.signatureIntro}>Hormat Kami, </Text>
+                {invoice.signature_url && (
+                  // eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf/renderer Image doesn't support alt
+                  <Image
+                    src={invoice.signature_url}
+                    style={styles.signatureImage}
+                  />
+                )}
+                <View style={styles.signatureLine} />
+                <Text style={styles.signatureLabel}>
+                  {invoice.signature_name || "Signature"}
+                </Text>
+              </View>
+            </View>
+
           </View>
         </Page>
       </Document>
