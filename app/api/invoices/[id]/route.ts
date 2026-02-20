@@ -4,13 +4,14 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 const ItemSchema = z.object({
   id: z.string().optional(),
-  type: z.enum(["default", "murti"]).optional().default("default"),
+  type: z.enum(["default", "murti", "japfa"]).optional().default("default"),
   tujuan: z.string().min(1),
   jenis: z.string().optional().default(""),
   nopol: z.string().min(1),
   ongkir: z.number().nonnegative(),
   berat: z.number().nonnegative().optional().default(0),
   kuli: z.number().nonnegative().optional().default(0),
+  uang_makan: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
   tanggal_item: z.string().optional().default(""),
 });
@@ -89,7 +90,8 @@ export async function PUT(
 
     const totalOngkir = data.items.reduce((sum, it) => sum + it.ongkir, 0);
     const totalKuli = data.items.reduce((sum, it) => sum + (it.kuli || 0), 0);
-    const grandTotal = totalOngkir + totalKuli;
+    const totalUangMakan = data.items.reduce((sum, it) => sum + (it.uang_makan || 0), 0);
+    const grandTotal = totalOngkir + totalKuli + totalUangMakan;
 
     // Update invoice header
     const { error: invErr } = await sb
@@ -131,6 +133,7 @@ export async function PUT(
       ongkir: it.ongkir,
       berat: it.berat || 0,
       kuli: it.kuli || 0,
+      uang_makan: it.uang_makan || 0,
       keterangan: it.keterangan,
       tanggal_item: it.tanggal_item || null,
     }));

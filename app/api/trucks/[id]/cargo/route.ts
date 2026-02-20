@@ -14,6 +14,7 @@ const CargoSchema = z.object({
   fuel: z.number().nonnegative().optional().default(0),
   operational_cost: z.number().nonnegative().optional().default(0),
   other_cost: z.number().nonnegative().optional().default(0),
+  tanpa_balen: z.number().nonnegative().optional().default(0),
   total: z.number().nullable().optional().default(null),
   notes: z.string().optional().default(""),
 });

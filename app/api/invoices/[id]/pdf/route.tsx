@@ -71,11 +71,17 @@ export async function GET(
     const hasMurtiType =
       sortedItems?.some((it) => it.type === "murti") || false;
 
+    // Check if there's any japfa type item
+    const hasJapfaType =
+      sortedItems?.some((it) => it.type === "japfa") || false;
+
     const subtotal =
       sortedItems?.reduce((sum, it) => sum + (it.ongkir || 0), 0) || 0;
     const totalKuli =
       sortedItems?.reduce((sum, it) => sum + (it.kuli || 0), 0) || 0;
-    const grandTotal = subtotal + totalKuli;
+    const totalUangMakan =
+      sortedItems?.reduce((sum, it) => sum + (it.uang_makan || 0), 0) || 0;
+    const grandTotal = subtotal + totalKuli + totalUangMakan;
 
     const styles = StyleSheet.create({
       page: {
@@ -178,10 +184,10 @@ export async function GET(
         paddingHorizontal: 4,
         backgroundColor: colors.white,
       },
-      // Column widths - center aligned
+      // Column widths - center aligned (default: with Jenis, no Uang Makan)
       colTanggal: { width: "11%", textAlign: "center" },
       colNopol: { width: "13%", textAlign: "center", paddingLeft: 6 },
-      colTujuan: { width: "15%", textAlign: "center", paddingLeft: 4 },
+      colTujuan: { width: "20%", textAlign: "center", paddingLeft: 4 },
       colJenis: { width: "13%", textAlign: "center" },
       colOngkir: { width: "13%", textAlign: "center" },
       colKuli: { width: "12%", textAlign: "center", paddingLeft: 4 },
@@ -195,6 +201,15 @@ export async function GET(
       colKuliMurti: { width: "14%", textAlign: "center", paddingLeft: 4 },
       colBeratMurti: { width: "13%", textAlign: "center", paddingLeft: 4 },
       colKeteranganMurti: { width: "13%", textAlign: "center" },
+      // Column widths for Japfa (with Jenis + Uang Makan, no Kuli)
+      colTanggalJapfa: { width: "10%", textAlign: "center" },
+      colNopolJapfa: { width: "13%", textAlign: "center", paddingLeft: 6 },
+      colTujuanJapfa: { width: "20%", textAlign: "center", paddingLeft: 4 },
+      colJenisJapfa: { width: "11%", textAlign: "center" },
+      colOngkirJapfa: { width: "13%", textAlign: "center" },
+      colUangMakanJapfa: { width: "13%", textAlign: "center" },
+      colBeratJapfa: { width: "10%", textAlign: "center", paddingLeft: 4 },
+      colKeteranganJapfa: { width: "17%", textAlign: "center" },
       // Bottom section (transfer + totals side by side)
       bottomContainer: {
         flexDirection: "row",
@@ -327,7 +342,36 @@ export async function GET(
 
           {/* Table Header */}
           <View style={styles.tableHeader} fixed>
-            {hasMurtiType ? (
+            {hasJapfaType ? (
+              <>
+                <Text style={[styles.tableHeaderText, styles.colTanggalJapfa]}>
+                  Tanggal
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colNopolJapfa]}>
+                  Nopol
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colTujuanJapfa]}>
+                  Tujuan
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colJenisJapfa]}>
+                  Jenis
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colOngkirJapfa]}>
+                  Ongkir (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colUangMakanJapfa]}>
+                  Uang Makan (RP)
+                </Text>
+                <Text style={[styles.tableHeaderText, styles.colBeratJapfa]}>
+                  Berat
+                </Text>
+                <Text
+                  style={[styles.tableHeaderText, styles.colKeteranganJapfa]}
+                >
+                  Keterangan
+                </Text>
+              </>
+            ) : hasMurtiType ? (
               <>
                 <Text style={[styles.tableHeaderText, styles.colTanggalMurti]}>
                   Tanggal
@@ -390,7 +434,24 @@ export async function GET(
               key={i}
               wrap={false}
             >
-              {hasMurtiType ? (
+              {hasJapfaType ? (
+                <>
+                  <Text style={styles.colTanggalJapfa}>
+                    {formatDateDMY(it.tanggal_item)}
+                  </Text>
+                  <Text style={styles.colNopolJapfa}>{it.nopol}</Text>
+                  <Text style={styles.colTujuanJapfa}>{it.tujuan}</Text>
+                  <Text style={styles.colJenisJapfa}>{it.jenis}</Text>
+                  <Text style={styles.colOngkirJapfa}>{idr(it.ongkir)}</Text>
+                  <Text style={styles.colUangMakanJapfa}>
+                    {it.uang_makan ? idr(it.uang_makan) : "-"}
+                  </Text>
+                  <Text style={styles.colBeratJapfa}>{it.berat}</Text>
+                  <Text style={styles.colKeteranganJapfa}>
+                    {it.keterangan || ""}
+                  </Text>
+                </>
+              ) : hasMurtiType ? (
                 <>
                   <Text style={styles.colTanggalMurti}>
                     {formatDateDMY(it.tanggal_item)}
@@ -467,6 +528,12 @@ export async function GET(
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total Kuli:</Text>
                   <Text style={styles.totalValue}>{idr(totalKuli)}</Text>
+                </View>
+              )}
+              {totalUangMakan > 0 && (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total Uang Makan:</Text>
+                  <Text style={styles.totalValue}>{idr(totalUangMakan)}</Text>
                 </View>
               )}
               <View style={styles.totalRow}>

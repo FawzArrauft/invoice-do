@@ -24,6 +24,7 @@ type Cargo = {
   fuel: number;
   operational_cost: number;
   other_cost: number;
+  tanpa_balen: number;
   total: number | null;
   notes: string;
 };
@@ -64,6 +65,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
     fuel: 0,
     operational_cost: 0,
     other_cost: 0,
+    tanpa_balen: 0,
     notes: "",
   });
 
@@ -109,13 +111,17 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       fuel: 0,
       operational_cost: 0,
       other_cost: 0,
+      tanpa_balen: 0,
       notes: "",
     });
     setEditingCargo(null);
   }
 
   async function handleSaveCargo() {
-    const payload = { ...cargoForm, truck_id: id };
+    // If tanpa_balen > 0, bypass calculation and set total directly
+    const payload = cargoForm.tanpa_balen > 0
+      ? { ...cargoForm, truck_id: id, total: cargoForm.tanpa_balen }
+      : { ...cargoForm, truck_id: id };
     const url = editingCargo
       ? `/api/trucks/${id}/cargo/${editingCargo.id}`
       : `/api/trucks/${id}/cargo`;
@@ -149,6 +155,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       fuel: cargo.fuel || 0,
       operational_cost: cargo.operational_cost || 0,
       other_cost: cargo.other_cost || 0,
+      tanpa_balen: cargo.tanpa_balen || 0,
       notes: cargo.notes,
     });
     setShowCargoForm(true);
@@ -386,7 +393,17 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                 value={cargoForm.balen_freight_cost}
                 onChange={(val) => setCargoForm({ ...cargoForm, balen_freight_cost: val })}
               />
-            </div> {selectedMonth ? `(${selectedMonth})` : "(All Time)"}
+            </div>
+            <div>
+              <RupiahInput
+                label="Tanpa Balen (IDR)"
+                value={cargoForm.tanpa_balen}
+                onChange={(val) => setCargoForm({ ...cargoForm, tanpa_balen: val })}
+              />
+              {cargoForm.tanpa_balen > 0 && (
+                <p className="text-xs text-amber-400 mt-1">* Nilai ini langsung masuk ke Total tanpa perhitungan</p>
+              )}
+            </div>
             <div>
               <label className="mb-2 block text-sm text-zinc-300">Balen Cargo Type</label>
               <input
@@ -459,6 +476,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                 <th className="px-3 py-3 text-center">Balen</th>
                 <th className="px-3 py-3 text-center">Balen Freight Cost</th>
                 <th className="px-3 py-3 text-center">Balen Cargo Type</th>
+                <th className="px-3 py-3 text-center">Tanpa Balen</th>
                 <th className="px-3 py-3 text-center">Total</th>
                 <th className="px-3 py-3 text-center">Notes</th>
                 <th className="px-3 py-3 text-center">Actions</th>
@@ -475,6 +493,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                   <td className="px-3 py-3 text-center">{c.balen || "-"}</td>
                   <td className="px-3 py-3 text-center">{formatIDR(c.balen_freight_cost)}</td>
                   <td className="px-3 py-3 text-center">{c.balen_cargo_type || "-"}</td>
+                  <td className="px-3 py-3 text-center">{c.tanpa_balen ? formatIDR(c.tanpa_balen) : "-"}</td>
                   <td className="px-3 py-3 text-center font-semibold text-amber-400">{c.total != null ? formatIDR(c.total) : "-"}</td>
                   <td className="px-3 py-3 text-center">{c.notes || "-"}</td>
                   <td className="px-3 py-3 text-center">
@@ -512,7 +531,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               ))}
               {filteredAndSortedCargoList.length === 0 && (
                 <tr>
-                  <td colSpan={11} className="px-4 py-6 text-center text-zinc-500">
+                  <td colSpan={12} className="px-4 py-6 text-center text-zinc-500">
                     {selectedMonth ? "Tidak ada cargo di bulan ini" : "Belum ada data cargo"}
                   </td>
                 </tr>
@@ -520,7 +539,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               {/* Table Total Row */}
               {filteredAndSortedCargoList.length > 0 && (
                 <tr className="bg-zinc-800 border-t-2 border-zinc-600">
-                  <td colSpan={8} className="px-3 py-3 text-right font-bold">
+                  <td colSpan={9} className="px-3 py-3 text-right font-bold">
                     TOTAL {selectedMonth ? `(${selectedMonth})` : ""}:
                   </td>
                   <td className="px-3 py-3 text-center font-bold text-lg text-amber-400">

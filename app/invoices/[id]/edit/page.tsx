@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
-type ItemType = "default" | "murti";
+type ItemType = "default" | "murti" | "japfa";
 
 type Item = {
   id?: string;
@@ -14,6 +14,7 @@ type Item = {
   ongkir: number;
   berat: number;
   kuli: number;
+  uang_makan: number;
   keterangan: string;
   tanggal_item: string;
 };
@@ -60,6 +61,9 @@ export default function EditInvoicePage() {
   // Refs for auto-scroll
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
+  // Ref for bottom "Add Row" button area
+  const bottomAddRowRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     async function loadInvoice() {
       try {
@@ -89,10 +93,11 @@ export default function EditInvoicePage() {
                 ongkir: it.ongkir || 0,
                 berat: it.berat || 0,
                 kuli: it.kuli || 0,
+                uang_makan: it.uang_makan || 0,
                 keterangan: it.keterangan || "",
                 tanggal_item: it.tanggal_item || "",
               }))
-            : [{ type: "default" as ItemType, nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: "" }]
+            : [{ type: "default" as ItemType, nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: "" }]
         );
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Error loading invoice");
@@ -127,7 +132,12 @@ export default function EditInvoicePage() {
     [items]
   );
 
-  const total = totalOngkir + totalKuli;
+  const totalUangMakan = useMemo(
+    () => items.reduce((sum, it) => sum + (Number(it.uang_makan) || 0), 0),
+    [items]
+  );
+
+  const total = totalOngkir + totalKuli + totalUangMakan;
 
   function updateItem(i: number, patch: Partial<Item>) {
     setItems((prev) =>
@@ -138,14 +148,12 @@ export default function EditInvoicePage() {
   function addRow() {
     setItems((prev) => [
       ...prev,
-      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
     ]);
-    // Auto-scroll to newly added item after render
+    // Auto-scroll to bottom add row area after render
     setTimeout(() => {
-      const lastIndex = items.length;
-      const lastRef = itemRefs.current[lastIndex];
-      if (lastRef) {
-        lastRef.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (bottomAddRowRef.current) {
+        bottomAddRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     }, 100);
   }
@@ -187,6 +195,7 @@ export default function EditInvoicePage() {
         ongkir: Number(it.ongkir) || 0,
         berat: Number(it.berat) || 0,
         kuli: Number(it.kuli) || 0,
+        uang_makan: Number(it.uang_makan) || 0,
         keterangan: it.keterangan || "",
         tanggal_item: it.tanggal_item || "",
       })),
@@ -306,12 +315,18 @@ export default function EditInvoicePage() {
                   <select
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
                     value={it.type}
-                    onChange={(e) =>
-                      updateItem(i, { type: e.target.value as ItemType })
-                    }
+                    onChange={(e) => {
+                      const newType = e.target.value as ItemType;
+                      const patch: Partial<Item> = { type: newType };
+                      if (newType === "japfa") {
+                        patch.tujuan = "JAPFA SIDOARJO";
+                      }
+                      updateItem(i, patch);
+                    }}
                   >
                     <option value="default">Default</option>
                     <option value="murti">Murti</option>
+                    <option value="japfa">Japfa</option>
                   </select>
                 </div>
 
@@ -341,12 +356,13 @@ export default function EditInvoicePage() {
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
                     value={it.tujuan}
+                    readOnly={it.type === "japfa"}
                     onChange={(e) => updateItem(i, { tujuan: e.target.value })}
                   />
                 </div>
 
-                {/* Jenis - Only show for Default type */}
-                {it.type === "default" && (
+                {/* Jenis - Show for Default and Japfa type */}
+                {(it.type === "default" || it.type === "japfa") && (
                   <div className="sm:col-span-2">
                     <Label>Jenis</Label>
                     <input
@@ -384,20 +400,38 @@ export default function EditInvoicePage() {
                   </div>
                 )}
 
-                <div className="sm:col-span-2">
-                  <Label>Kuli (IDR)</Label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    value={it.kuli}
-                    onChange={(e) =>
-                      updateItem(i, { kuli: Number(e.target.value || 0) })
-                    }
-                  />
-                </div>
+                {/* Kuli - Show for non-Japfa types */}
+                {it.type !== "japfa" && (
+                  <div className="sm:col-span-2">
+                    <Label>Kuli (IDR)</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.kuli}
+                      onChange={(e) =>
+                        updateItem(i, { kuli: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
 
-                {/* Berat - Show for Murti type (after Kuli) */}
-                {it.type === "murti" && (
+                {/* Uang Makan - Show only for Japfa type */}
+                {it.type === "japfa" && (
+                  <div className="sm:col-span-2">
+                    <Label>Uang Makan (IDR)</Label>
+                    <input
+                      inputMode="numeric"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                      value={it.uang_makan}
+                      onChange={(e) =>
+                        updateItem(i, { uang_makan: Number(e.target.value || 0) })
+                      }
+                    />
+                  </div>
+                )}
+
+                {/* Berat - Show for Murti/Japfa type (after Kuli) */}
+                {(it.type === "murti" || it.type === "japfa") && (
                   <div className="sm:col-span-2">
                     <Label>Berat</Label>
                     <input
@@ -438,6 +472,16 @@ export default function EditInvoicePage() {
           ))}
         </div>
 
+        {/* Bottom Add Row button - avoids scrolling back up */}
+        <div ref={bottomAddRowRef} className="mt-3 flex justify-end">
+          <button
+            onClick={addRow}
+            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+          >
+            + Add Row
+          </button>
+        </div>
+
         <div className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
           <div className="flex items-center justify-between">
             <span className="text-sm text-zinc-400">Total Ongkir</span>
@@ -447,6 +491,12 @@ export default function EditInvoicePage() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-zinc-400">Total Kuli</span>
               <span className="text-sm">Rp {formatIDR(totalKuli)}</span>
+            </div>
+          )}
+          {totalUangMakan > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-zinc-400">Total Uang Makan</span>
+              <span className="text-sm">Rp {formatIDR(totalUangMakan)}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
