@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faFileExcel, faEye, faEyeSlash, faSpinner } from "@fortawesome/free-solid-svg-icons";
 
 function idr(n: number) {
   return "Rp " + new Intl.NumberFormat("id-ID").format(n || 0);
@@ -46,6 +48,8 @@ export default function ReportsPage() {
   const [tab, setTab] = useState<"jenis" | "tujuan" | "nopol" | "company">(
     "jenis",
   );
+  const [exporting, setExporting] = useState(false);
+  const [selectedCompany, setSelectedCompany] = useState(""); // for export filter
 
   async function load() {
     setLoading(true);
@@ -77,6 +81,52 @@ export default function ReportsPage() {
     return [];
   }, [data, tab]);
 
+  async function handleExportExcel() {
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        start: startDate,
+        end: endDate,
+      });
+      if (selectedCompany) {
+        params.set("company", selectedCompany);
+      }
+
+      const res = await fetch(`/api/reports/export?${params.toString()}`);
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json?.error || "Export failed");
+      }
+
+      // Download file
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+
+      // Extract filename from Content-Disposition header or generate one
+      const disposition = res.headers.get("Content-Disposition");
+      let filename = `Laporan_Trucking_${startDate}_${endDate}.xlsx`;
+      if (disposition) {
+        const match = disposition.match(/filename="(.+)"/);
+        if (match) filename = match[1];
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (e: unknown) {
+      const message =
+        e instanceof Error ? e.message : "Failed to export report";
+      alert(message);
+    } finally {
+      setExporting(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <div className="flex items-start justify-between gap-3 mb-6">
@@ -91,17 +141,7 @@ export default function ReportsPage() {
               className="ml-2 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
               title={showAmount ? "Hide amounts" : "Show amounts"}
             >
-              {showAmount ? (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                </svg>
-              )}
+              <FontAwesomeIcon icon={showAmount ? faEye : faEyeSlash} className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -114,7 +154,7 @@ export default function ReportsPage() {
       </div>
 
       {/* Controls */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <div>
           <label className="text-sm text-zinc-300 block mb-2">Start Date</label>
           <input
@@ -135,18 +175,61 @@ export default function ReportsPage() {
           />
         </div>
 
-        <div className="flex items-end">
+        <div>
+          <label className="text-sm text-zinc-300 block mb-2">
+            Perusahaan (Export)
+          </label>
+          <select
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+          >
+            <option value="">Semua Perusahaan</option>
+            {data.byCompany.map((c) => (
+              <option key={c.key} value={c.key}>
+                {c.key}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end gap-2">
           <button
             onClick={load}
-            className="w-full rounded-xl bg-white text-zinc-950 px-5 py-3 font-medium"
+            className="flex-1 rounded-xl bg-white text-zinc-950 px-5 py-3 font-medium"
           >
-            Generate Report
+            Generate
+          </button>
+          <button
+            onClick={handleExportExcel}
+            disabled={exporting || loading}
+            className="rounded-xl bg-emerald-600 text-white px-4 py-3 font-medium hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title="Export ke Excel"
+          >
+            {exporting ? (
+              <FontAwesomeIcon icon={faSpinner} className="w-4 h-4 animate-spin" />
+            ) : (
+              <FontAwesomeIcon icon={faFileExcel} className="w-4 h-4" />
+            )}
+            <span className="hidden sm:inline">
+              {exporting ? "Exporting..." : "Excel"}
+            </span>
           </button>
         </div>
       </div>
 
+      {/* Total Revenue Card */}
+      {data.totalRevenue > 0 && (
+        <div className="mt-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
+          <div className="text-sm text-zinc-400">Total Revenue</div>
+          <div className="text-2xl font-bold mt-1">
+            {showAmount ? idr(data.totalRevenue) : hiddenIdr()}
+          </div>
+        </div>
+      )}
+
       {/* Tabs */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4 mt-4">
         <TabButton active={tab === "jenis"} onClick={() => setTab("jenis")}>
           By Jenis
         </TabButton>

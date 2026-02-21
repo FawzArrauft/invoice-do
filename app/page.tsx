@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+
 
 type ItemType = "default" | "murti" | "japfa";
 
@@ -21,7 +23,19 @@ function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
 
+type Pabrik = {
+  id: string;
+  name: string;
+  tujuan: string;
+  jenis: string;
+  ongkir: number;
+  berat: number;
+  kuli: number;
+  uang_makan: number;
+};
+
 export default function CreateInvoicePage() {
+  const router = useRouter();
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [kepadaYth, setKepadaYth] = useState("");
@@ -59,6 +73,42 @@ export default function CreateInvoicePage() {
   const [newNoRekening, setNewNoRekening] = useState("");
   const [newAccountName, setNewAccountName] = useState("");
   const [savingBank, setSavingBank] = useState(false);
+
+  // Pabrik dropdown state
+  const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
+  const [loadingPabrik, setLoadingPabrik] = useState(false);
+
+  // Load pabrik list on mount
+  useEffect(() => {
+    async function loadPabrik() {
+      setLoadingPabrik(true);
+      try {
+        const res = await fetch("/api/settings/pabrik");
+        const json = await res.json();
+        if (json.data) setPabrikList(json.data);
+      } catch (err) {
+        console.error("Failed to load pabrik:", err);
+      } finally {
+        setLoadingPabrik(false);
+      }
+    }
+    loadPabrik();
+  }, []);
+
+  // Handle pabrik selection for a specific item
+  function handlePabrikChange(itemIndex: number, pabrikId: string) {
+    const selected = pabrikList.find((p) => p.id === pabrikId);
+    if (selected) {
+      updateItem(itemIndex, {
+        tujuan: selected.tujuan,
+        jenis: selected.jenis,
+        ongkir: selected.ongkir,
+        berat: selected.berat,
+        kuli: selected.kuli,
+        uang_makan: selected.uang_makan,
+      });
+    }
+  }
 
   // Load default signature on mount
   useEffect(() => {
@@ -177,15 +227,15 @@ export default function CreateInvoicePage() {
   }, [useDefaultSignature, defaultSignatureUrl, defaultSignatureName]);
 
   // Sort items by tanggal_item for display (earlier dates first)
-  const sortedItemsWithIndex = useMemo(() => {
-    return items
-      .map((item, originalIndex) => ({ item, originalIndex }))
-      .sort((a, b) => {
-        const dateA = a.item.tanggal_item ? new Date(a.item.tanggal_item).getTime() : 0;
-        const dateB = b.item.tanggal_item ? new Date(b.item.tanggal_item).getTime() : 0;
-        return dateA - dateB;
-      });
-  }, [items]);
+  // const sortedItemsWithIndex = useMemo(() => {
+  //   return items
+  //     .map((item, originalIndex) => ({ item, originalIndex }))
+  //     .sort((a, b) => {
+  //       const dateA = a.item.tanggal_item ? new Date(a.item.tanggal_item).getTime() : 0;
+  //       const dateB = b.item.tanggal_item ? new Date(b.item.tanggal_item).getTime() : 0;
+  //       return dateA - dateB;
+  //     });
+  // }, [items]);
 
   const totalOngkir = useMemo(
     () => items.reduce((sum, it) => sum + (Number(it.ongkir) || 0), 0),
@@ -327,7 +377,7 @@ export default function CreateInvoicePage() {
       alert(data?.error || "Failed");
       return;
     }
-    alert("Invoice saved successfully");
+    router.push("/invoices");
   }
 
   return (
@@ -393,7 +443,7 @@ export default function CreateInvoicePage() {
         </div>
 
         <div className="space-y-3">
-          {sortedItemsWithIndex.map(({ item: it, originalIndex: i }, displayIndex) => (
+          {items.map((it, i) => (
             <div
               key={i}
               ref={(el) => { itemRefs.current[i] = el; }}
@@ -418,6 +468,26 @@ export default function CreateInvoicePage() {
                     <option value="default">Default</option>
                     <option value="murti">Murti</option>
                     <option value="japfa">Japfa</option>
+                  </select>
+                </div>
+
+                {/* Pabrik Selector */}
+                <div className="sm:col-span-2">
+                  <Label>Pabrik</Label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    defaultValue=""
+                    disabled={loadingPabrik}
+                    onChange={(e) => handlePabrikChange(i, e.target.value)}
+                  >
+                    <option value="" disabled>
+                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
+                    </option>
+                    {pabrikList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 
@@ -549,7 +619,7 @@ export default function CreateInvoicePage() {
 
                 <div className="sm:col-span-2 flex sm:flex-col items-center justify-between gap-5">
                   <span className="text-xs text-zinc-400 sm:mt-7">
-                    Row {displayIndex + 1}
+                    Row {i + 1}
                   </span>
                   <button
                     onClick={() => removeRow(i)}

@@ -27,7 +27,7 @@ function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; in
     <a
       href={`/api/invoices/${invoiceId}/pdf`}
       download={`invoice-${invoiceNumber}.pdf`}
-      className="flex items-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+      className="flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -44,7 +44,7 @@ function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; in
         <polyline points="7 10 12 15 17 10" />
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
-      PDF
+      <span className="hidden sm:inline">PDF</span>
     </a>
   );
 }
@@ -53,7 +53,7 @@ function EditButton({ invoiceId }: { invoiceId: string }) {
   return (
     <Link
       href={`/invoices/${invoiceId}/edit`}
-      className="flex items-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
+      className="flex items-center justify-center gap-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-1.5 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors whitespace-nowrap"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -69,7 +69,7 @@ function EditButton({ invoiceId }: { invoiceId: string }) {
         <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
         <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
       </svg>
-      Edit
+      <span className="hidden sm:inline">Edit</span>
     </Link>
   );
 }
@@ -97,7 +97,7 @@ function DeleteButton({ invoiceId, onDelete }: { invoiceId: string; onDelete: ()
     <button
       onClick={handleDelete}
       disabled={deleting}
-      className="flex items-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+      className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors disabled:opacity-50 whitespace-nowrap"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -115,7 +115,7 @@ function DeleteButton({ invoiceId, onDelete }: { invoiceId: string; onDelete: ()
         <line x1="10" y1="11" x2="10" y2="17" />
         <line x1="14" y1="11" x2="14" y2="17" />
       </svg>
-      {deleting ? "..." : "Hapus"}
+      <span className="hidden sm:inline">{deleting ? "..." : "Hapus"}</span>
     </button>
   );
 }
@@ -185,8 +185,8 @@ export default function InvoicesPage() {
     <div className="mx-auto max-w-5xl p-4 sm:p-6">
       {/* Delete All Confirmation Modal */}
       {showDeleteAllModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full mx-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md w-full">
             <h2 className="text-xl font-semibold text-red-400 mb-4">⚠️ Hapus Semua Invoice</h2>
             <p className="text-zinc-300 mb-4">
               Tindakan ini akan menghapus <strong>SEMUA invoice</strong> dan tidak dapat dibatalkan.
@@ -224,7 +224,7 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Invoices</h1>
           <p className="text-sm text-zinc-400">History (latest 100)</p>
@@ -233,14 +233,14 @@ export default function InvoicesPage() {
           {data.length > 0 && (
             <button
               onClick={() => setShowDeleteAllModal(true)}
-              className="rounded-xl border border-red-800 bg-red-900/30 px-4 py-2 text-sm text-red-400 hover:bg-red-900/50"
+              className="rounded-xl border border-red-800 bg-red-900/30 px-3 sm:px-4 py-2 text-sm text-red-400 hover:bg-red-900/50 whitespace-nowrap"
             >
               Hapus Semua
             </button>
           )}
           <Link
             href="/"
-            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm"
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-3 sm:px-4 py-2 text-sm whitespace-nowrap"
           >
             + New Invoice
           </Link>
@@ -270,7 +270,7 @@ export default function InvoicesPage() {
             placeholder="Search by invoice number, customer, or date..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900/50 pl-10 pr-4 py-3 outline-none focus:border-zinc-600 placeholder:text-zinc-500"
+            className="w-full rounded-xl border border-zinc-800 bg-zinc-900/50 pl-10 pr-4 py-3 outline-none focus:border-zinc-600 placeholder:text-zinc-500 text-sm"
           />
         </div>
       </div>
@@ -293,7 +293,45 @@ export default function InvoicesPage() {
             key={inv.id}
             className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 hover:bg-zinc-900/60 transition-colors"
           >
-            <div className="flex items-center justify-between gap-3">
+            {/* Mobile Layout (< sm) */}
+            <div className="flex sm:hidden flex-col gap-3">
+              <Link href={`/invoices/${inv.id}`} className="flex-1">
+                <div className="font-semibold text-base">
+                  {inv.invoice_number}{" "}
+                  <span className="text-xs text-zinc-400">
+                    {inv.is_manual ? "(manual)" : "(auto)"}
+                  </span>
+                </div>
+                <div className="text-sm text-zinc-400 mt-1">
+                  {formatDateDMY(inv.tanggal)} • {inv.kepada_yth}
+                </div>
+              </Link>
+              
+              <div className="flex items-center justify-between">
+                <div className="text-left">
+                  <div className="font-semibold text-sm">
+                    Rp {new Intl.NumberFormat("id-ID").format(inv.total_ongkir)}
+                  </div>
+                  <div className="text-xs text-zinc-500 mt-0.5">
+                    {new Date(inv.created_at).toLocaleString("id-ID", { 
+                      day: '2-digit', 
+                      month: 'short', 
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                </div>
+                <div className="flex gap-1.5">
+                  <EditButton invoiceId={inv.id} />
+                  <DownloadPdfButton invoiceId={inv.id} invoiceNumber={inv.invoice_number} />
+                  <DeleteButton invoiceId={inv.id} onDelete={fetchInvoices} />
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Layout (>= sm) */}
+            <div className="hidden sm:flex items-center justify-between gap-3">
               <Link href={`/invoices/${inv.id}`} className="flex-1 min-w-0">
                 <div className="font-semibold">
                   {inv.invoice_number}{" "}

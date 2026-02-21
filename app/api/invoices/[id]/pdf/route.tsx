@@ -21,6 +21,7 @@ const colors = {
   darkGray: "#333333",
   white: "#ffffff",
   lightYellow: "#ffe710",
+  rowGray: "#eeeeee",
 };
 
 function idr(n: number) {
@@ -171,17 +172,17 @@ export async function GET(
       tableRow: {
         flexDirection: "row",
         borderBottomWidth: 0.5,
-        borderBottomColor: "#dddddd",
-        paddingVertical: 4,
-        paddingHorizontal: 4,
-        backgroundColor: colors.lightGray,
+        borderBottomColor: "#cccccc",
+        paddingVertical: 4.5,
+        paddingHorizontal: 4.5,
+        backgroundColor: colors.rowGray,
       },
       tableRowAlt: {
         flexDirection: "row",
         borderBottomWidth: 0.5,
-        borderBottomColor: "#dddddd",
-        paddingVertical: 4,
-        paddingHorizontal: 4,
+        borderBottomColor: "#cccccc",
+        paddingVertical: 4.5,
+        paddingHorizontal: 4.5,
         backgroundColor: colors.white,
       },
       // Column widths - center aligned (default: with Jenis, no Uang Makan)
