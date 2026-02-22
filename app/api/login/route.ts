@@ -124,21 +124,21 @@ export async function POST(req: Request) {
     // Auth token cookie
     res.cookies.set("auth-token", authData.session?.access_token || "", {
       ...cookieBase,
-      maxAge: 60 * 60 * 24 * 7, // 7 days
+      maxAge: 60 * 60 * 24 * 5, // 5 days
     });
 
     // Refresh token cookie
     if (authData.session?.refresh_token) {
       res.cookies.set("refresh-token", authData.session.refresh_token, {
         ...cookieBase,
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: 60 * 60 * 24 * 5, // 5 days
       });
     }
 
     // User role cookie (untuk middleware)
     res.cookies.set("user-role", role, {
       ...cookieBase,
-      maxAge: 60 * 60 * 24 * 7,
+      maxAge: 60 * 60 * 24 * 5, // 5 days
     });
 
     return res;

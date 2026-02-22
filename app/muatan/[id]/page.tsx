@@ -79,6 +79,12 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
   // Result List state
   const [resultList, setResultList] = useState<ResultItem[]>([]);
 
+  // Muatan Truk dropdown options
+  const [muatanTrukList, setMuatanTrukList] = useState<{ id: string; name: string; cargo_type: string; freight_cost: number }[]>([]);
+
+  // Balen dropdown options
+  const [balenList, setBalenList] = useState<{ id: string; name: string; balen_cargo_type: string; balen_freight_cost: number }[]>([]);
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -98,6 +104,25 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Load muatan truk and balen options
+  useEffect(() => {
+    async function loadDropdownOptions() {
+      try {
+        const [muatanRes, balenRes] = await Promise.all([
+          fetch("/api/settings/muatan-truk"),
+          fetch("/api/settings/balen"),
+        ]);
+        const muatanJson = await muatanRes.json();
+        const balenJson = await balenRes.json();
+        if (muatanJson.data) setMuatanTrukList(muatanJson.data);
+        if (balenJson.data) setBalenList(balenJson.data);
+      } catch (err) {
+        console.error("Failed to load dropdown options:", err);
+      }
+    }
+    loadDropdownOptions();
+  }, []);
 
   function resetCargoForm() {
     setCargoForm({
@@ -354,13 +379,30 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Cargo</label>
-              <input
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
-                placeholder="Nama cargo"
+              <label className="mb-2 block text-sm text-zinc-300">Cargo (Muatan Truk)</label>
+              <select
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-200"
                 value={cargoForm.cargo}
-                onChange={(e) => setCargoForm({ ...cargoForm, cargo: e.target.value })}
-              />
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  const selected = muatanTrukList.find((m) => m.name === selectedName);
+                  if (selected) {
+                    setCargoForm({
+                      ...cargoForm,
+                      cargo: selected.name,
+                      cargo_type: selected.cargo_type,
+                      freight_cost: selected.freight_cost,
+                    });
+                  } else {
+                    setCargoForm({ ...cargoForm, cargo: selectedName });
+                  }
+                }}
+              >
+                <option value="">-- Pilih Muatan --</option>
+                {muatanTrukList.map((m) => (
+                  <option key={m.id} value={m.name}>{m.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <RupiahInput
@@ -380,12 +422,29 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <label className="mb-2 block text-sm text-zinc-300">Balen (optional)</label>
-              <input
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
-                placeholder="Jumlah balen"
+              <select
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-200"
                 value={cargoForm.balen}
-                onChange={(e) => setCargoForm({ ...cargoForm, balen: e.target.value })}
-              />
+                onChange={(e) => {
+                  const selectedName = e.target.value;
+                  const selected = balenList.find((b) => b.name === selectedName);
+                  if (selected) {
+                    setCargoForm({
+                      ...cargoForm,
+                      balen: selected.name,
+                      balen_cargo_type: selected.balen_cargo_type,
+                      balen_freight_cost: selected.balen_freight_cost,
+                    });
+                  } else {
+                    setCargoForm({ ...cargoForm, balen: selectedName });
+                  }
+                }}
+              >
+                <option value="">-- Pilih Balen --</option>
+                {balenList.map((b) => (
+                  <option key={b.id} value={b.name}>{b.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <RupiahInput

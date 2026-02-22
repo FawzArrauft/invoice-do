@@ -33,8 +33,9 @@ export default function LoginPage() {
         throw new Error(data.error || "Login gagal");
       }
 
-      // Gunakan replace untuk navigasi lebih cepat (tidak ada history back ke login)
+      // Gunakan replace + refresh agar middleware langsung baca cookie baru
       router.replace("/");
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal");
     } finally {
