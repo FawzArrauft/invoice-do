@@ -2,6 +2,9 @@
 
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
+import { NopolInput } from "@/components/NopolInput";
+import { IDRInput } from "@/components/IDRInput";
 
 
 type ItemType = "default" | "murti" | "japfa";
@@ -37,6 +40,7 @@ type Pabrik = {
 
 export default function CreateInvoicePage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
   const [kepadaYth, setKepadaYth] = useState("");
@@ -180,7 +184,7 @@ export default function CreateInvoicePage() {
   // Save new bank account
   async function saveNewBank() {
     if (!newBankName.trim() || !newNoRekening.trim() || !newAccountName.trim()) {
-      alert("Semua field bank wajib diisi");
+      showToast("Semua field bank wajib diisi", "error");
       return;
     }
     setSavingBank(true);
@@ -211,10 +215,10 @@ export default function CreateInvoicePage() {
       setNewAccountName("");
       setShowAddBank(false);
       
-      alert("Bank berhasil disimpan!");
+      showToast("Bank berhasil disimpan!", "success");
     } catch (err) {
       console.error(err);
-      alert("Gagal menyimpan bank");
+      showToast("Gagal menyimpan bank", "error");
     } finally {
       setSavingBank(false);
     }
@@ -302,7 +306,7 @@ export default function CreateInvoicePage() {
 
   async function saveAsDefaultSignature() {
     if (!signatureUrl) {
-      alert("Upload tanda tangan dulu sebelum menyimpan sebagai default");
+      showToast("Upload tanda tangan dulu sebelum menyimpan sebagai default", "error");
       return;
     }
     setSavingDefault(true);
@@ -322,10 +326,10 @@ export default function CreateInvoicePage() {
       setDefaultSignatureUrl(signatureUrl);
       setDefaultSignatureName(signatureName);
       setUseDefaultSignature(true);
-      alert("Tanda tangan default berhasil disimpan!");
+      showToast("Tanda tangan default berhasil disimpan!", "success");
     } catch (err) {
       console.error(err);
-      alert("Gagal menyimpan tanda tangan default");
+      showToast("Gagal menyimpan tanda tangan default", "error");
     } finally {
       setSavingDefault(false);
     }
@@ -358,12 +362,12 @@ export default function CreateInvoicePage() {
 
     for (const [index, it] of items.entries()) {
       if (!it.tujuan.trim()) {
-        alert(`Row ${index + 1}: Tujuan wajib diisi`);
+        showToast(`Row ${index + 1}: Tujuan wajib diisi`, "error");
         return;
       }
       // Jenis only required for default type
       if (!it.nopol.trim()) {
-        alert(`Row ${index + 1}: NoPol wajib diisi`);
+        showToast(`Row ${index + 1}: NoPol wajib diisi`, "error");
         return;
       }
     }
@@ -376,9 +380,10 @@ export default function CreateInvoicePage() {
 
     const data = await res.json();
     if (!res.ok) {
-      alert(data?.error || "Failed");
+      showToast(data?.error || "Gagal menyimpan invoice", "error");
       return;
     }
+    showToast("Invoice berhasil disimpan!", "success");
     router.push("/invoices");
   }
 
@@ -485,12 +490,11 @@ export default function CreateInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Label>NoPol *</Label>
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                  <NopolInput
                     value={it.nopol}
-                    onChange={(e) => updateItem(i, { nopol: e.target.value })}
+                    onChange={(val) => updateItem(i, { nopol: val })}
                   />
                 </div>
 
@@ -538,13 +542,9 @@ export default function CreateInvoicePage() {
 
                 <div className="sm:col-span-2">
                   <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : it.type === "japfa" ? "Ongkir (IDR)" : "Ongkir (IDR)"}</Label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  <IDRInput
                     value={it.ongkir}
-                    onChange={(e) =>
-                      updateItem(i, { ongkir: Number(e.target.value || 0) })
-                    }
+                    onChange={(val) => updateItem(i, { ongkir: val })}
                   />
                 </div>
 
@@ -567,13 +567,9 @@ export default function CreateInvoicePage() {
                 {it.type !== "japfa" && (
                   <div className="sm:col-span-2">
                     <Label>Kuli (IDR)</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    <IDRInput
                       value={it.kuli}
-                      onChange={(e) =>
-                        updateItem(i, { kuli: Number(e.target.value || 0) })
-                      }
+                      onChange={(val) => updateItem(i, { kuli: val })}
                     />
                   </div>
                 )}
@@ -582,13 +578,9 @@ export default function CreateInvoicePage() {
                 {it.type === "japfa" && (
                   <div className="sm:col-span-2">
                     <Label>Uang Makan (IDR)</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    <IDRInput
                       value={it.uang_makan}
-                      onChange={(e) =>
-                        updateItem(i, { uang_makan: Number(e.target.value || 0) })
-                      }
+                      onChange={(val) => updateItem(i, { uang_makan: val })}
                     />
                   </div>
                 )}

@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useToast } from "@/components/Toast";
+import { NopolInput } from "@/components/NopolInput";
+import { IDRInput } from "@/components/IDRInput";
 
 type ItemType = "default" | "murti" | "japfa";
 
@@ -40,6 +43,7 @@ function formatIDR(n: number) {
 export default function EditInvoicePage() {
   const params = useParams();
   const router = useRouter();
+  const { showToast } = useToast();
   const invoiceId = params.id as string;
 
   const [loading, setLoading] = useState(true);
@@ -209,11 +213,11 @@ export default function EditInvoicePage() {
 
     for (const [index, it] of items.entries()) {
       if (!it.tujuan.trim()) {
-        alert(`Row ${index + 1}: Tujuan wajib diisi`);
+        showToast(`Row ${index + 1}: Tujuan wajib diisi`, "error");
         return;
       }
       if (!it.nopol.trim()) {
-        alert(`Row ${index + 1}: NoPol wajib diisi`);
+        showToast(`Row ${index + 1}: NoPol wajib diisi`, "error");
         return;
       }
     }
@@ -228,10 +232,10 @@ export default function EditInvoicePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        alert(data?.error || "Failed");
+        showToast(data?.error || "Failed", "error");
         return;
       }
-      alert("Invoice updated successfully");
+      showToast("Invoice updated successfully", "success");
       router.push("/invoices");
     } finally {
       setSaving(false);
@@ -342,12 +346,11 @@ export default function EditInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-3">
                   <Label>NoPol *</Label>
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                  <NopolInput
                     value={it.nopol}
-                    onChange={(e) => updateItem(i, { nopol: e.target.value })}
+                    onChange={(val) => updateItem(i, { nopol: val })}
                   />
                 </div>
 
@@ -375,13 +378,9 @@ export default function EditInvoicePage() {
 
                 <div className="sm:col-span-2">
                   <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : "Ongkir (IDR)"}</Label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  <IDRInput
                     value={it.ongkir}
-                    onChange={(e) =>
-                      updateItem(i, { ongkir: Number(e.target.value || 0) })
-                    }
+                    onChange={(val) => updateItem(i, { ongkir: val })}
                   />
                 </div>
 
@@ -404,13 +403,9 @@ export default function EditInvoicePage() {
                 {it.type !== "japfa" && (
                   <div className="sm:col-span-2">
                     <Label>Kuli (IDR)</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    <IDRInput
                       value={it.kuli}
-                      onChange={(e) =>
-                        updateItem(i, { kuli: Number(e.target.value || 0) })
-                      }
+                      onChange={(val) => updateItem(i, { kuli: val })}
                     />
                   </div>
                 )}
@@ -419,13 +414,9 @@ export default function EditInvoicePage() {
                 {it.type === "japfa" && (
                   <div className="sm:col-span-2">
                     <Label>Uang Makan (IDR)</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    <IDRInput
                       value={it.uang_makan}
-                      onChange={(e) =>
-                        updateItem(i, { uang_makan: Number(e.target.value || 0) })
-                      }
+                      onChange={(val) => updateItem(i, { uang_makan: val })}
                     />
                   </div>
                 )}

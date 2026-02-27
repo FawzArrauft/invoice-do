@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useMemo } from "react";
+import { useToast } from "@/components/Toast";
 
 type Invoice = {
   id: string;
@@ -76,6 +77,7 @@ function EditButton({ invoiceId }: { invoiceId: string }) {
 
 function DeleteButton({ invoiceId, onDelete }: { invoiceId: string; onDelete: () => void }) {
   const [deleting, setDeleting] = useState(false);
+  const { showToast } = useToast();
 
   async function handleDelete() {
     if (!confirm("Yakin ingin menghapus invoice ini?")) return;
@@ -84,9 +86,10 @@ function DeleteButton({ invoiceId, onDelete }: { invoiceId: string; onDelete: ()
       const res = await fetch(`/api/invoices/${invoiceId}`, { method: "DELETE" });
       if (res.ok) {
         onDelete();
+        showToast("Invoice berhasil dihapus", "success");
       } else {
         const data = await res.json();
-        alert(data?.error || "Gagal menghapus");
+        showToast(data?.error || "Gagal menghapus", "error");
       }
     } finally {
       setDeleting(false);
@@ -128,6 +131,7 @@ export default function InvoicesPage() {
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAll, setDeletingAll] = useState(false);
+  const { showToast } = useToast();
 
   async function fetchInvoices() {
     try {
@@ -148,7 +152,7 @@ export default function InvoicesPage() {
 
   async function handleDeleteAll() {
     if (deleteConfirmText !== "HAPUS SEMUA") {
-      alert("Ketik 'HAPUS SEMUA' untuk konfirmasi");
+      showToast("Ketik 'HAPUS SEMUA' untuk konfirmasi", "warning");
       return;
     }
     setDeletingAll(true);
@@ -156,12 +160,12 @@ export default function InvoicesPage() {
       const res = await fetch("/api/invoices/delete-all?confirm=DELETE_ALL_INVOICES", { method: "DELETE" });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Gagal menghapus");
-      alert(`Berhasil menghapus ${json.deletedCount} invoice`);
+      showToast(`Berhasil menghapus ${json.deletedCount} invoice`, "success");
       setShowDeleteAllModal(false);
       setDeleteConfirmText("");
       fetchInvoices();
     } catch (err) {
-      alert(err instanceof Error ? err.message : "Gagal menghapus semua invoice");
+      showToast(err instanceof Error ? err.message : "Gagal menghapus semua invoice", "error");
     } finally {
       setDeletingAll(false);
     }

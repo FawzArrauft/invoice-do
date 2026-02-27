@@ -12,6 +12,7 @@ import {
   faTruck,
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
+import { IDRInput } from "@/components/IDRInput";
 
 type Pabrik = {
   id: string;
@@ -551,11 +552,9 @@ export default function SettingsPage() {
               <label className="mb-2 block text-sm text-zinc-300">
                 Ongkir (IDR)
               </label>
-              <input
-                inputMode="numeric"
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              <IDRInput
                 value={formOngkir}
-                onChange={(e) => setFormOngkir(Number(e.target.value || 0))}
+                onChange={(val) => setFormOngkir(val)}
               />
             </div>
             <div>
@@ -571,22 +570,18 @@ export default function SettingsPage() {
               <label className="mb-2 block text-sm text-zinc-300">
                 Kuli (IDR)
               </label>
-              <input
-                inputMode="numeric"
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              <IDRInput
                 value={formKuli}
-                onChange={(e) => setFormKuli(Number(e.target.value || 0))}
+                onChange={(val) => setFormKuli(val)}
               />
             </div>
             <div>
               <label className="mb-2 block text-sm text-zinc-300">
                 Uang Makan (IDR)
               </label>
-              <input
-                inputMode="numeric"
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              <IDRInput
                 value={formUangMakan}
-                onChange={(e) => setFormUangMakan(Number(e.target.value || 0))}
+                onChange={(val) => setFormUangMakan(val)}
               />
             </div>
             <div>
@@ -682,13 +677,10 @@ export default function SettingsPage() {
                         <label className="mb-1 block text-xs text-zinc-400">
                           Ongkir
                         </label>
-                        <input
-                          inputMode="numeric"
-                          className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                        <IDRInput
                           value={editOngkir}
-                          onChange={(e) =>
-                            setEditOngkir(Number(e.target.value || 0))
-                          }
+                          onChange={(val) => setEditOngkir(val)}
+                          className="!rounded-xl !border-zinc-700 !bg-zinc-900 !px-3 !py-2 !text-sm"
                         />
                       </div>
                       <div>
@@ -708,26 +700,20 @@ export default function SettingsPage() {
                         <label className="mb-1 block text-xs text-zinc-400">
                           Kuli
                         </label>
-                        <input
-                          inputMode="numeric"
-                          className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                        <IDRInput
                           value={editKuli}
-                          onChange={(e) =>
-                            setEditKuli(Number(e.target.value || 0))
-                          }
+                          onChange={(val) => setEditKuli(val)}
+                          className="!rounded-xl !border-zinc-700 !bg-zinc-900 !px-3 !py-2 !text-sm"
                         />
                       </div>
                       <div>
                         <label className="mb-1 block text-xs text-zinc-400">
                           Uang Makan
                         </label>
-                        <input
-                          inputMode="numeric"
-                          className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                        <IDRInput
                           value={editUangMakan}
-                          onChange={(e) =>
-                            setEditUangMakan(Number(e.target.value || 0))
-                          }
+                          onChange={(val) => setEditUangMakan(val)}
+                          className="!rounded-xl !border-zinc-700 !bg-zinc-900 !px-3 !py-2 !text-sm"
                         />
                       </div>
                       <div>
@@ -856,12 +842,9 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm text-zinc-300">Freight Cost (IDR)</label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    placeholder="0"
-                    value={muatanTrukFreightCost || ""}
-                    onChange={(e) => setMuatanTrukFreightCost(Number(e.target.value || 0))}
+                  <IDRInput
+                    value={muatanTrukFreightCost}
+                    onChange={(val) => setMuatanTrukFreightCost(val)}
                   />
                 </div>
               </div>
@@ -928,11 +911,10 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <label className="mb-1 block text-xs text-zinc-400">Freight Cost (IDR)</label>
-                            <input
-                              inputMode="numeric"
-                              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                              value={editMuatanTrukFreightCost || ""}
-                              onChange={(e) => setEditMuatanTrukFreightCost(Number(e.target.value || 0))}
+                            <IDRInput
+                              value={editMuatanTrukFreightCost}
+                              onChange={(val) => setEditMuatanTrukFreightCost(val)}
+                              className="!rounded-xl !border-zinc-700 !bg-zinc-900 !px-3 !py-2 !text-sm"
                             />
                           </div>
                         </div>
@@ -1032,12 +1014,9 @@ export default function SettingsPage() {
                 </div>
                 <div>
                   <label className="mb-2 block text-sm text-zinc-300">Balen Freight Cost (IDR)</label>
-                  <input
-                    inputMode="numeric"
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    placeholder="0"
-                    value={balenFreightCost || ""}
-                    onChange={(e) => setBalenFreightCost(Number(e.target.value || 0))}
+                  <IDRInput
+                    value={balenFreightCost}
+                    onChange={(val) => setBalenFreightCost(val)}
                   />
                 </div>
               </div>
@@ -1104,11 +1083,10 @@ export default function SettingsPage() {
                           </div>
                           <div>
                             <label className="mb-1 block text-xs text-zinc-400">Balen Freight Cost (IDR)</label>
-                            <input
-                              inputMode="numeric"
-                              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-                              value={editBalenFreightCost || ""}
-                              onChange={(e) => setEditBalenFreightCost(Number(e.target.value || 0))}
+                            <IDRInput
+                              value={editBalenFreightCost}
+                              onChange={(val) => setEditBalenFreightCost(val)}
+                              className="!rounded-xl !border-zinc-700 !bg-zinc-900 !px-3 !py-2 !text-sm"
                             />
                           </div>
                         </div>

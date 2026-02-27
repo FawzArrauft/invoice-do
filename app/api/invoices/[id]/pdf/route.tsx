@@ -123,7 +123,7 @@ export async function GET(
       infoLabel: {
         backgroundColor: colors.gold,
         padding: 6,
-        width: 90,
+        width: 130,
         fontSize: 10,
         fontFamily: "Helvetica-Bold",
         color: colors.black,
@@ -131,7 +131,7 @@ export async function GET(
       infoValue: {
         backgroundColor: colors.lightGray,
         padding: 6,
-        width: 120,
+        width: 130,
         fontSize: 10,
         color: colors.black,
       },
@@ -171,24 +171,26 @@ export async function GET(
       },
       tableRow: {
         flexDirection: "row",
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#cccccc",
-        paddingVertical: 4.5,
+        borderBottomWidth: 1.2,
+        borderBottomColor: "#999999",
+        borderTopWidth: 0,
+        paddingVertical: 5,
         paddingHorizontal: 4.5,
-        backgroundColor: colors.rowGray,
+        backgroundColor: colors.white,
       },
       tableRowAlt: {
         flexDirection: "row",
-        borderBottomWidth: 0.5,
-        borderBottomColor: "#cccccc",
-        paddingVertical: 4.5,
+        borderBottomWidth: 1.2,
+        borderBottomColor: "#999999",
+        borderTopWidth: 0,
+        paddingVertical: 5,
         paddingHorizontal: 4.5,
-        backgroundColor: colors.white,
+        backgroundColor: "#f9f9f9",
       },
       // Column widths - center aligned (default: with Jenis, no Uang Makan)
       colTanggal: { width: "11%", textAlign: "center" },
       colNopol: { width: "13%", textAlign: "center", paddingLeft: 6 },
-      colTujuan: { width: "20%", textAlign: "center", paddingLeft: 4 },
+      colTujuan: { width: "14%", textAlign: "center", paddingLeft: 4 },
       colJenis: { width: "13%", textAlign: "center" },
       colOngkir: { width: "13%", textAlign: "center" },
       colKuli: { width: "12%", textAlign: "center", paddingLeft: 4 },
@@ -205,7 +207,7 @@ export async function GET(
       // Column widths for Japfa (with Jenis + Uang Makan, no Kuli)
       colTanggalJapfa: { width: "10%", textAlign: "center" },
       colNopolJapfa: { width: "13%", textAlign: "center", paddingLeft: 6 },
-      colTujuanJapfa: { width: "20%", textAlign: "center", paddingLeft: 4 },
+      colTujuanJapfa: { width: "14%", textAlign: "center", paddingLeft: 4 },
       colJenisJapfa: { width: "11%", textAlign: "center" },
       colOngkirJapfa: { width: "13%", textAlign: "center" },
       colUangMakanJapfa: { width: "13%", textAlign: "center" },
@@ -318,7 +320,7 @@ export async function GET(
               <Text style={styles.infoValue}>{invoice.invoice_number}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Tanggal Rincian:</Text>
+              <Text style={styles.infoLabel}>Tanggal Buat Rincian:</Text>
               <Text style={styles.infoValue}>
                 {formatDateDMY(invoice.tanggal)}
               </Text>
