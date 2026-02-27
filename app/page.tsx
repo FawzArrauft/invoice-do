@@ -32,6 +32,7 @@ type Pabrik = {
   berat: number;
   kuli: number;
   uang_makan: number;
+  keterangan: string;
 };
 
 export default function CreateInvoicePage() {
@@ -106,6 +107,7 @@ export default function CreateInvoicePage() {
         berat: selected.berat,
         kuli: selected.kuli,
         uang_makan: selected.uang_makan,
+        keterangan: selected.keterangan,
       });
     }
   }
@@ -471,26 +473,6 @@ export default function CreateInvoicePage() {
                   </select>
                 </div>
 
-                {/* Pabrik Selector */}
-                <div className="sm:col-span-2">
-                  <Label>Pabrik</Label>
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    defaultValue=""
-                    disabled={loadingPabrik}
-                    onChange={(e) => handlePabrikChange(i, e.target.value)}
-                  >
-                    <option value="" disabled>
-                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
-                    </option>
-                    {pabrikList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 <div className="sm:col-span-2">
                   <Label>Tanggal</Label>
                   <input
@@ -510,6 +492,26 @@ export default function CreateInvoicePage() {
                     value={it.nopol}
                     onChange={(e) => updateItem(i, { nopol: e.target.value })}
                   />
+                </div>
+
+                {/* Pabrik Selector */}
+                <div className="sm:col-span-2">
+                  <Label>Pabrik</Label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    defaultValue=""
+                    disabled={loadingPabrik}
+                    onChange={(e) => handlePabrikChange(i, e.target.value)}
+                  >
+                    <option value="" disabled>
+                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
+                    </option>
+                    {pabrikList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="sm:col-span-2">

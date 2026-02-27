@@ -22,6 +22,7 @@ type Pabrik = {
   berat: number;
   kuli: number;
   uang_makan: number;
+  keterangan: string;
 };
 
 type MuatanTruk = {
@@ -55,6 +56,7 @@ export default function SettingsPage() {
   const [formBerat, setFormBerat] = useState(0);
   const [formKuli, setFormKuli] = useState(0);
   const [formUangMakan, setFormUangMakan] = useState(0);
+  const [formKeterangan, setFormKeterangan] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Edit state
@@ -66,6 +68,7 @@ export default function SettingsPage() {
   const [editBerat, setEditBerat] = useState(0);
   const [editKuli, setEditKuli] = useState(0);
   const [editUangMakan, setEditUangMakan] = useState(0);
+  const [editKeterangan, setEditKeterangan] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Search state for pabrik
@@ -129,6 +132,7 @@ export default function SettingsPage() {
     setFormBerat(0);
     setFormKuli(0);
     setFormUangMakan(0);
+    setFormKeterangan("");
     setShowForm(false);
   }
 
@@ -150,6 +154,7 @@ export default function SettingsPage() {
           berat: formBerat,
           kuli: formKuli,
           uang_makan: formUangMakan,
+          keterangan: formKeterangan,
         }),
       });
       const json = await res.json();
@@ -174,6 +179,7 @@ export default function SettingsPage() {
     setEditBerat(p.berat);
     setEditKuli(p.kuli);
     setEditUangMakan(p.uang_makan);
+    setEditKeterangan(p.keterangan);
   }
 
   function cancelEdit() {
@@ -196,6 +202,7 @@ export default function SettingsPage() {
           berat: editBerat,
           kuli: editKuli,
           uang_makan: editUangMakan,
+          keterangan: editKeterangan,
         }),
       });
       const json = await res.json();
@@ -335,7 +342,8 @@ export default function SettingsPage() {
   const filteredPabrikList = pabrikList.filter((p) =>
     p.name.toLowerCase().includes(pabrikSearch.toLowerCase()) ||
     p.tujuan.toLowerCase().includes(pabrikSearch.toLowerCase()) ||
-    p.jenis.toLowerCase().includes(pabrikSearch.toLowerCase())
+    p.jenis.toLowerCase().includes(pabrikSearch.toLowerCase()) ||
+    p.keterangan.toLowerCase().includes(pabrikSearch.toLowerCase())
   );
 
   const filteredMuatanTrukList = muatanTrukList.filter((m) =>
@@ -581,6 +589,17 @@ export default function SettingsPage() {
                 onChange={(e) => setFormUangMakan(Number(e.target.value || 0))}
               />
             </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300">
+                Keterangan
+              </label>
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                placeholder="Contoh: Catatan tambahan"
+                value={formKeterangan}
+                onChange={(e) => setFormKeterangan(e.target.value)}
+              />
+            </div>
           </div>
           <button
             onClick={handleAdd}
@@ -711,6 +730,18 @@ export default function SettingsPage() {
                           }
                         />
                       </div>
+                      <div>
+                        <label className="mb-1 block text-xs text-zinc-400">
+                          Keterangan
+                        </label>
+                        <input
+                          className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                          value={editKeterangan}
+                          onChange={(e) =>
+                            setEditKeterangan(e.target.value)
+                          }
+                        />
+                      </div>
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button
@@ -745,6 +776,11 @@ export default function SettingsPage() {
                         <span>Kuli: Rp {formatIDR(p.kuli)}</span>
                         <span>Uang Makan: Rp {formatIDR(p.uang_makan)}</span>
                       </div>
+                      {p.keterangan && (
+                        <div className="text-sm text-zinc-400 mt-1">
+                          <span>Keterangan: {p.keterangan}</span>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button

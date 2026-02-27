@@ -308,17 +308,17 @@ export async function GET(
         <Page size="A4" style={styles.page}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>INVOICE HR</Text>
+            <Text style={styles.title}>RINCIAN PENGIRIMAN</Text>
           </View>
 
           {/* Invoice Info */}
           <View style={styles.infoSection}>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Invoice #:</Text>
+              <Text style={styles.infoLabel}>Pengiriman #:</Text>
               <Text style={styles.infoValue}>{invoice.invoice_number}</Text>
             </View>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Invoice Date:</Text>
+              <Text style={styles.infoLabel}>Tanggal Rincian:</Text>
               <Text style={styles.infoValue}>
                 {formatDateDMY(invoice.tanggal)}
               </Text>
@@ -569,7 +569,7 @@ export async function GET(
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="invoice-${invoice.invoice_number}.pdf"`,
+        "Content-Disposition": `attachment; filename="rincian-pengiriman-${invoice.invoice_number}.pdf"`,
       },
     });
   } catch (err: unknown) {

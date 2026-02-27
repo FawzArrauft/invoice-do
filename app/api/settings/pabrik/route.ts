@@ -25,6 +25,7 @@ export async function GET() {
         berat: row.berat || 0,
         kuli: row.kuli || 0,
         uang_makan: row.uang_makan || 0,
+        keterangan: row.keterangan || "",
         createdAt: row.created_at,
       })) || [];
 
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const { name, tujuan, jenis, ongkir, berat, kuli, uang_makan } = body;
+    const { name, tujuan, jenis, ongkir, berat, kuli, uang_makan, keterangan } = body;
 
     if (!name?.trim()) {
       return NextResponse.json(
@@ -68,6 +69,7 @@ export async function POST(request: Request) {
           berat: Number(berat) || 0,
           kuli: Number(kuli) || 0,
           uang_makan: Number(uang_makan) || 0,
+          keterangan: keterangan || "",
         },
       ])
       .select()
@@ -85,6 +87,7 @@ export async function POST(request: Request) {
         berat: data.berat,
         kuli: data.kuli,
         uang_makan: data.uang_makan,
+        keterangan: data.keterangan || "",
         createdAt: data.created_at,
       },
     });
@@ -104,7 +107,7 @@ export async function POST(request: Request) {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const { id, name, tujuan, jenis, ongkir, berat, kuli, uang_makan } = body;
+    const { id, name, tujuan, jenis, ongkir, berat, kuli, uang_makan, keterangan } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -125,6 +128,7 @@ export async function PUT(request: Request) {
         berat: Number(berat) || 0,
         kuli: Number(kuli) || 0,
         uang_makan: Number(uang_makan) || 0,
+        keterangan: keterangan || "",
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
@@ -143,6 +147,7 @@ export async function PUT(request: Request) {
         berat: data.berat,
         kuli: data.kuli,
         uang_makan: data.uang_makan,
+        keterangan: data.keterangan || "",
       },
     });
   } catch (err) {
