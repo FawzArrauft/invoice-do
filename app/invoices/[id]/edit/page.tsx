@@ -36,6 +36,25 @@ type InvoiceData = {
   items: Item[];
 };
 
+type Pabrik = {
+  id: string;
+  name: string;
+  tujuan: string;
+  jenis: string;
+  ongkir: number;
+  berat: number;
+  kuli: number;
+  uang_makan: number;
+  keterangan: string;
+};
+
+type ValidationErrors = {
+  kepadaYth?: string;
+  tanggal?: string;
+  signatureName?: string;
+  items: Record<number, { nopol?: string; tujuan?: string }>;
+};
+
 function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
 }
@@ -62,11 +81,22 @@ export default function EditInvoicePage() {
   const [signatureUrl, setSignatureUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  // Validation state
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({ items: {} });
+  const [showValidation, setShowValidation] = useState(false);
+
+  // Pabrik dropdown state
+  const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
+  const [loadingPabrik, setLoadingPabrik] = useState(false);
+
   // Refs for auto-scroll
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   // Ref for bottom "Add Row" button area
   const bottomAddRowRef = useRef<HTMLDivElement | null>(null);
+
+  // Ref for kepada yth field
+  const kepadaYthRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     async function loadInvoice() {
@@ -115,6 +145,63 @@ export default function EditInvoicePage() {
     }
   }, [invoiceId]);
 
+  // Load pabrik list on mount
+  useEffect(() => {
+    async function loadPabrik() {
+      setLoadingPabrik(true);
+      try {
+        const res = await fetch("/api/settings/pabrik");
+        const json = await res.json();
+        if (json.data) setPabrikList(json.data);
+      } catch (err) {
+        console.error("Failed to load pabrik:", err);
+      } finally {
+        setLoadingPabrik(false);
+      }
+    }
+    loadPabrik();
+  }, []);
+
+  // Handle pabrik selection for a specific item
+  function handlePabrikChange(itemIndex: number, pabrikId: string) {
+    const selected = pabrikList.find((p) => p.id === pabrikId);
+    if (selected) {
+      updateItem(itemIndex, {
+        tujuan: selected.tujuan,
+        jenis: selected.jenis,
+        ongkir: selected.ongkir,
+        berat: selected.berat,
+        kuli: selected.kuli,
+        uang_makan: selected.uang_makan,
+        keterangan: selected.keterangan,
+      });
+    }
+  }
+
+  // Validate form and return errors
+  function validateForm(): ValidationErrors {
+    const errors: ValidationErrors = { items: {} };
+    if (!kepadaYth.trim()) errors.kepadaYth = "Kepada Yth wajib diisi";
+    if (!tanggal.trim()) errors.tanggal = "Tanggal wajib diisi";
+    if (!signatureName.trim()) errors.signatureName = "Nama tanda tangan wajib diisi";
+
+    items.forEach((it, index) => {
+      const itemErrors: { nopol?: string; tujuan?: string } = {};
+      if (!it.nopol.trim()) itemErrors.nopol = "NoPol wajib diisi";
+      if (!it.tujuan.trim()) itemErrors.tujuan = "Tujuan wajib diisi";
+      if (Object.keys(itemErrors).length > 0) {
+        errors.items[index] = itemErrors;
+      }
+    });
+
+    return errors;
+  }
+
+  // Check if there are any errors
+  function hasErrors(errors: ValidationErrors): boolean {
+    return !!errors.kepadaYth || !!errors.tanggal || !!errors.signatureName || Object.keys(errors.items).length > 0;
+  }
+
   // Sort items by tanggal_item for display (earlier dates first)
   const sortedItemsWithIndex = useMemo(() => {
     return items
@@ -147,17 +234,31 @@ export default function EditInvoicePage() {
     setItems((prev) =>
       prev.map((it, idx) => (idx === i ? { ...it, ...patch } : it))
     );
+    // Clear validation errors for this item when user types
+    if (showValidation) {
+      setValidationErrors((prev) => {
+        const newItems = { ...prev.items };
+        if (newItems[i]) {
+          if (patch.nopol !== undefined && patch.nopol.trim()) delete newItems[i].nopol;
+          if (patch.tujuan !== undefined && patch.tujuan.trim()) delete newItems[i].tujuan;
+          if (newItems[i] && Object.keys(newItems[i]).length === 0) delete newItems[i];
+        }
+        return { ...prev, items: newItems };
+      });
+    }
   }
 
   function addRow() {
+    const newIndex = items.length;
     setItems((prev) => [
       ...prev,
       { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
     ]);
-    // Auto-scroll to bottom add row area after render
+    // Auto-scroll to the new row's date field area
     setTimeout(() => {
-      if (bottomAddRowRef.current) {
-        bottomAddRowRef.current.scrollIntoView({ behavior: "smooth", block: "center" });
+      const newRowEl = itemRefs.current[newIndex];
+      if (newRowEl) {
+        newRowEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 100);
   }
@@ -186,6 +287,34 @@ export default function EditInvoicePage() {
   }
 
   async function saveInvoice() {
+    // Run validation first
+    const errors = validateForm();
+    setValidationErrors(errors);
+    setShowValidation(true);
+
+    if (hasErrors(errors)) {
+      // Collect all error messages
+      const messages: string[] = [];
+      if (errors.kepadaYth) messages.push(errors.kepadaYth);
+      if (errors.tanggal) messages.push(errors.tanggal);
+      if (errors.signatureName) messages.push(errors.signatureName);
+      Object.entries(errors.items).forEach(([idx, errs]) => {
+        const rowNum = Number(idx) + 1;
+        if (errs.nopol) messages.push(`Row ${rowNum}: ${errs.nopol}`);
+        if (errs.tujuan) messages.push(`Row ${rowNum}: ${errs.tujuan}`);
+      });
+      showToast(messages.join(" • "), "error");
+
+      // Scroll to first error
+      if (errors.kepadaYth || errors.tanggal) {
+        kepadaYthRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      } else {
+        const firstErrorIdx = Number(Object.keys(errors.items)[0]);
+        itemRefs.current[firstErrorIdx]?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      return;
+    }
+
     const payload = {
       invoiceNumber,
       tanggal,
@@ -210,17 +339,6 @@ export default function EditInvoicePage() {
       signatureUrl,
       signatureName,
     };
-
-    for (const [index, it] of items.entries()) {
-      if (!it.tujuan.trim()) {
-        showToast(`Row ${index + 1}: Tujuan wajib diisi`, "error");
-        return;
-      }
-      if (!it.nopol.trim()) {
-        showToast(`Row ${index + 1}: NoPol wajib diisi`, "error");
-        return;
-      }
-    }
 
     setSaving(true);
     try {
@@ -272,22 +390,33 @@ export default function EditInvoicePage() {
             />
           </Field>
 
-          <Field label="Tanggal">
+          <Field label="Tanggal *" error={showValidation ? validationErrors.tanggal : undefined}>
             <input
               type="date"
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              className={`w-full rounded-xl border ${showValidation && validationErrors.tanggal ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
               value={tanggal}
-              onChange={(e) => setTanggal(e.target.value)}
+              onChange={(e) => {
+                setTanggal(e.target.value);
+                if (showValidation && e.target.value.trim()) {
+                  setValidationErrors((prev) => ({ ...prev, tanggal: undefined }));
+                }
+              }}
             />
           </Field>
 
-          <Field label="Kepada Yth *">
+          <Field label="Kepada Yth *" error={showValidation ? validationErrors.kepadaYth : undefined}>
             <input
+              ref={kepadaYthRef}
               required
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              className={`w-full rounded-xl border ${showValidation && validationErrors.kepadaYth ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
               placeholder="Nama Perusahaan"
               value={kepadaYth}
-              onChange={(e) => setKepadaYth(e.target.value)}
+              onChange={(e) => {
+                setKepadaYth(e.target.value);
+                if (showValidation && e.target.value.trim()) {
+                  setValidationErrors((prev) => ({ ...prev, kepadaYth: undefined }));
+                }
+              }}
             />
           </Field>
         </div>
@@ -310,8 +439,14 @@ export default function EditInvoicePage() {
             <div
               key={i}
               ref={(el) => { itemRefs.current[i] = el; }}
-              className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-3 sm:p-4"
+              className={`rounded-2xl border ${showValidation && validationErrors.items[i] ? 'border-red-500/50' : 'border-zinc-800'} bg-zinc-950/40 p-3 sm:p-4`}
             >
+              {/* Validation error banner for this row */}
+              {showValidation && validationErrors.items[i] && (
+                <div className="mb-2 rounded-lg bg-red-950/30 border border-red-500/30 px-3 py-1.5 text-xs text-red-400">
+                  {Object.values(validationErrors.items[i]).join(" • ")}
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
                 {/* Type Selector */}
                 <div className="sm:col-span-2">
@@ -348,16 +483,38 @@ export default function EditInvoicePage() {
 
                 <div className="sm:col-span-3">
                   <Label>NoPol *</Label>
-                  <NopolInput
-                    value={it.nopol}
-                    onChange={(val) => updateItem(i, { nopol: val })}
-                  />
+                  <div className={showValidation && validationErrors.items[i]?.nopol ? 'rounded-xl ring-1 ring-red-500' : ''}>
+                    <NopolInput
+                      value={it.nopol}
+                      onChange={(val) => updateItem(i, { nopol: val })}
+                    />
+                  </div>
+                </div>
+
+                {/* Pabrik Selector */}
+                <div className="sm:col-span-2">
+                  <Label>Pabrik</Label>
+                  <select
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    defaultValue=""
+                    disabled={loadingPabrik}
+                    onChange={(e) => handlePabrikChange(i, e.target.value)}
+                  >
+                    <option value="" disabled>
+                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
+                    </option>
+                    {pabrikList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="sm:col-span-2">
                   <Label>Tujuan *</Label>
                   <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                    className={`w-full rounded-xl border ${showValidation && validationErrors.items[i]?.tujuan ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3`}
                     value={it.tujuan}
                     readOnly={it.type === "japfa"}
                     onChange={(e) => updateItem(i, { tujuan: e.target.value })}
@@ -571,13 +728,21 @@ export default function EditInvoicePage() {
             )}
 
             <div>
-              <label className="mb-2 block text-sm text-zinc-300">Nama di bawah tanda tangan</label>
+              <label className="mb-2 block text-sm text-zinc-300">Nama di bawah tanda tangan *</label>
               <input
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                className={`w-full rounded-xl border ${showValidation && validationErrors.signatureName ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
                 placeholder="Nama lengkap"
                 value={signatureName}
-                onChange={(e) => setSignatureName(e.target.value)}
+                onChange={(e) => {
+                  setSignatureName(e.target.value);
+                  if (showValidation && e.target.value.trim()) {
+                    setValidationErrors((prev) => ({ ...prev, signatureName: undefined }));
+                  }
+                }}
               />
+              {showValidation && validationErrors.signatureName && (
+                <p className="mt-1 text-xs text-red-400">{validationErrors.signatureName}</p>
+              )}
             </div>
           </div>
         </div>
@@ -605,14 +770,17 @@ export default function EditInvoicePage() {
 function Field({
   label,
   children,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
+  error?: string;
 }) {
   return (
     <div>
       <Label>{label}</Label>
       {children}
+      {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
     </div>
   );
 }

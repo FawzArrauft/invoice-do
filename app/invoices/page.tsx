@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useToast } from "@/components/Toast";
 
 type Invoice = {
@@ -12,6 +12,31 @@ type Invoice = {
   tanggal: string;
   kepada_yth: string;
   total_ongkir: number;
+};
+
+type InvoiceDetail = {
+  id: string;
+  invoice_number: string;
+  tanggal: string;
+  kepada_yth: string;
+  footer_tanggal: string;
+  bank_name: string;
+  no_rekening: string;
+  account_name: string;
+  signature_name: string;
+  items: {
+    id: string;
+    type: string;
+    nopol: string;
+    tujuan: string;
+    jenis: string;
+    ongkir: number;
+    berat: number;
+    kuli: number;
+    uang_makan: number;
+    keterangan: string;
+    tanggal_item: string;
+  }[];
 };
 
 function formatDateDMY(dateStr: string | null | undefined): string {
@@ -133,6 +158,11 @@ export default function InvoicesPage() {
   const [deletingAll, setDeletingAll] = useState(false);
   const { showToast } = useToast();
 
+  // Showcase/preview state
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, InvoiceDetail>>({});
+  const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
+
   async function fetchInvoices() {
     try {
       const res = await fetch("/api/invoices/list");
@@ -149,6 +179,31 @@ export default function InvoicesPage() {
   useEffect(() => {
     fetchInvoices();
   }, []);
+
+  // Toggle invoice detail showcase
+  const toggleDetail = useCallback(async (invoiceId: string) => {
+    if (expandedId === invoiceId) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(invoiceId);
+
+    // If already cached, don't refetch
+    if (detailCache[invoiceId]) return;
+
+    setLoadingDetail(invoiceId);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}`);
+      const json = await res.json();
+      if (res.ok && json.data) {
+        setDetailCache((prev) => ({ ...prev, [invoiceId]: json.data }));
+      }
+    } catch (err) {
+      console.error("Failed to load invoice detail:", err);
+    } finally {
+      setLoadingDetail(null);
+    }
+  }, [expandedId, detailCache]);
 
   async function handleDeleteAll() {
     if (deleteConfirmText !== "HAPUS SEMUA") {
@@ -295,11 +350,12 @@ export default function InvoicesPage() {
           filteredData.map((inv) => (
           <div
             key={inv.id}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 hover:bg-zinc-900/60 transition-colors"
+            className={`rounded-2xl border ${expandedId === inv.id ? 'border-zinc-600' : 'border-zinc-800'} bg-zinc-900/40 overflow-hidden transition-colors`}
           >
+            <div className="p-4 hover:bg-zinc-900/60 transition-colors">
             {/* Mobile Layout (< sm) */}
             <div className="flex sm:hidden flex-col gap-3">
-              <Link href={`/invoices/${inv.id}`} className="flex-1">
+              <button onClick={() => toggleDetail(inv.id)} className="flex-1 text-left">
                 <div className="font-semibold text-base">
                   {inv.invoice_number}{" "}
                   <span className="text-xs text-zinc-400">
@@ -307,9 +363,9 @@ export default function InvoicesPage() {
                   </span>
                 </div>
                 <div className="text-sm text-zinc-400 mt-1">
-                  {formatDateDMY(inv.tanggal)} • {inv.kepada_yth}
+                  {formatDateDMY(inv.tanggal)} &bull; {inv.kepada_yth}
                 </div>
-              </Link>
+              </button>
               
               <div className="flex items-center justify-between">
                 <div className="text-left">
@@ -336,17 +392,31 @@ export default function InvoicesPage() {
 
             {/* Desktop Layout (>= sm) */}
             <div className="hidden sm:flex items-center justify-between gap-3">
-              <Link href={`/invoices/${inv.id}`} className="flex-1 min-w-0">
+              <button onClick={() => toggleDetail(inv.id)} className="flex-1 min-w-0 text-left">
                 <div className="font-semibold">
                   {inv.invoice_number}{" "}
                   <span className="text-xs text-zinc-400">
                     {inv.is_manual ? "(manual)" : "(auto)"}
                   </span>
+                  <svg
+                    className={`inline-block ml-2 transition-transform ${expandedId === inv.id ? 'rotate-180' : ''}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
                 </div>
                 <div className="text-sm text-zinc-400">
-                  {formatDateDMY(inv.tanggal)} • {inv.kepada_yth}
+                  {formatDateDMY(inv.tanggal)} &bull; {inv.kepada_yth}
                 </div>
-              </Link>
+              </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="font-semibold">
@@ -363,9 +433,123 @@ export default function InvoicesPage() {
                 </div>
               </div>
             </div>
+            </div>
+
+            {/* Expandable Detail Showcase Table */}
+            {expandedId === inv.id && (
+              <div className="border-t border-zinc-800 bg-zinc-950/30 p-4">
+                {loadingDetail === inv.id ? (
+                  <div className="text-center py-4 text-sm text-zinc-400">Loading detail...</div>
+                ) : detailCache[inv.id] ? (
+                  <InvoiceShowcase detail={detailCache[inv.id]} />
+                ) : (
+                  <div className="text-center py-4 text-sm text-zinc-400">Gagal memuat detail</div>
+                )}
+              </div>
+            )}
           </div>
         ))
         )}
+      </div>
+    </div>
+  );
+}
+
+function formatIDR(n: number) {
+  return new Intl.NumberFormat("id-ID").format(n);
+}
+
+function InvoiceShowcase({ detail }: { detail: InvoiceDetail }) {
+  const totalOngkir = detail.items.reduce((sum, it) => sum + (it.ongkir || 0), 0);
+  const totalKuli = detail.items.reduce((sum, it) => sum + (it.kuli || 0), 0);
+  const totalUangMakan = detail.items.reduce((sum, it) => sum + (it.uang_makan || 0), 0);
+  const grandTotal = totalOngkir + totalKuli + totalUangMakan;
+
+  return (
+    <div className="space-y-4">
+      {/* Invoice Info */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+        <div>
+          <span className="text-zinc-500 block text-xs">Kepada Yth</span>
+          <span className="text-zinc-200">{detail.kepada_yth}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500 block text-xs">Tanggal</span>
+          <span className="text-zinc-200">{formatDateDMY(detail.tanggal)}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500 block text-xs">Bank</span>
+          <span className="text-zinc-200">{detail.bank_name || "-"}</span>
+        </div>
+        <div>
+          <span className="text-zinc-500 block text-xs">TTD</span>
+          <span className="text-zinc-200">{detail.signature_name || "-"}</span>
+        </div>
+      </div>
+
+      {/* Items Table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-700 text-zinc-400 text-xs">
+              <th className="text-left py-2 pr-2 font-medium">No</th>
+              <th className="text-left py-2 pr-2 font-medium">Tanggal</th>
+              <th className="text-left py-2 pr-2 font-medium">NoPol</th>
+              <th className="text-left py-2 pr-2 font-medium">Tujuan</th>
+              <th className="text-left py-2 pr-2 font-medium">Jenis</th>
+              <th className="text-right py-2 pr-2 font-medium">Ongkir</th>
+              <th className="text-right py-2 pr-2 font-medium">Kuli</th>
+              <th className="text-right py-2 pr-2 font-medium">U. Makan</th>
+              <th className="text-left py-2 font-medium">Ket.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {detail.items.map((item, idx) => (
+              <tr key={item.id || idx} className="border-b border-zinc-800/50 hover:bg-zinc-900/30">
+                <td className="py-2 pr-2 text-zinc-400">{idx + 1}</td>
+                <td className="py-2 pr-2 text-zinc-300 whitespace-nowrap">{formatDateDMY(item.tanggal_item)}</td>
+                <td className="py-2 pr-2 text-zinc-200 font-mono text-xs whitespace-nowrap">{item.nopol}</td>
+                <td className="py-2 pr-2 text-zinc-200">{item.tujuan}</td>
+                <td className="py-2 pr-2 text-zinc-300">{item.jenis || "-"}</td>
+                <td className="py-2 pr-2 text-right text-zinc-200 whitespace-nowrap">{formatIDR(item.ongkir)}</td>
+                <td className="py-2 pr-2 text-right text-zinc-300 whitespace-nowrap">{item.kuli ? formatIDR(item.kuli) : "-"}</td>
+                <td className="py-2 pr-2 text-right text-zinc-300 whitespace-nowrap">{item.uang_makan ? formatIDR(item.uang_makan) : "-"}</td>
+                <td className="py-2 text-zinc-400 text-xs">{item.keterangan || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr className="border-t border-zinc-700">
+              <td colSpan={5} className="py-2 text-right text-zinc-400 font-medium text-xs">TOTAL</td>
+              <td className="py-2 pr-2 text-right text-zinc-100 font-semibold whitespace-nowrap">{formatIDR(totalOngkir)}</td>
+              <td className="py-2 pr-2 text-right text-zinc-200 whitespace-nowrap">{totalKuli ? formatIDR(totalKuli) : "-"}</td>
+              <td className="py-2 pr-2 text-right text-zinc-200 whitespace-nowrap">{totalUangMakan ? formatIDR(totalUangMakan) : "-"}</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td colSpan={5} className="py-1 text-right text-zinc-300 font-semibold text-xs">GRAND TOTAL</td>
+              <td colSpan={3} className="py-1 text-right text-lg font-bold text-white whitespace-nowrap">Rp {formatIDR(grandTotal)}</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {/* Quick actions */}
+      <div className="flex gap-2 pt-2">
+        <Link
+          href={`/invoices/${detail.id}/edit`}
+          className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-4 py-2 text-xs font-medium text-blue-400 hover:bg-blue-500/20 transition-colors"
+        >
+          Edit Invoice
+        </Link>
+        <a
+          href={`/api/invoices/${detail.id}/pdf`}
+          download={`invoice-${detail.invoice_number}.pdf`}
+          className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
+        >
+          Download PDF
+        </a>
       </div>
     </div>
   );
