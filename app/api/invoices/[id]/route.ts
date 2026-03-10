@@ -2,18 +2,25 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
 
+const ExtraChargeSchema = z.object({
+  amount: z.number().nonnegative(),
+  label: z.string().optional().default(""),
+});
+
 const ItemSchema = z.object({
   id: z.string().optional(),
   type: z.enum(["default", "murti", "japfa"]).optional().default("default"),
-  tujuan: z.string().min(1),
+  tujuan: z.string(),
   jenis: z.string().optional().default(""),
-  nopol: z.string().min(1),
+  nopol: z.string(),
   ongkir: z.number().nonnegative(),
   berat: z.number().nonnegative().optional().default(0),
   kuli: z.number().nonnegative().optional().default(0),
   uang_makan: z.number().nonnegative().optional().default(0),
   keterangan: z.string().optional().default(""),
   tanggal_item: z.string().optional().default(""),
+  extra_charges: z.array(ExtraChargeSchema).optional().default([]),
+  is_empty_row: z.boolean().optional().default(false),
 });
 
 const UpdateBodySchema = z.object({
@@ -91,7 +98,8 @@ export async function PUT(
     const totalOngkir = data.items.reduce((sum, it) => sum + it.ongkir, 0);
     const totalKuli = data.items.reduce((sum, it) => sum + (it.kuli || 0), 0);
     const totalUangMakan = data.items.reduce((sum, it) => sum + (it.uang_makan || 0), 0);
-    const grandTotal = totalOngkir + totalKuli + totalUangMakan;
+    const totalExtraCharges = data.items.reduce((sum, it) => sum + (it.extra_charges || []).reduce((s, ec) => s + (ec.amount || 0), 0), 0);
+    const grandTotal = totalOngkir + totalKuli + totalUangMakan + totalExtraCharges;
 
     // Update invoice header
     const { error: invErr } = await sb
@@ -136,6 +144,8 @@ export async function PUT(
       uang_makan: it.uang_makan || 0,
       keterangan: it.keterangan,
       tanggal_item: it.tanggal_item || null,
+      extra_charges: it.extra_charges || [],
+      is_empty_row: it.is_empty_row || false,
     }));
 
     const { error: itemErr } = await sb

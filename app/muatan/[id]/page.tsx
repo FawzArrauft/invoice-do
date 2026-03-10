@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, use, useCallback } from "react";
 import { formatRupiah, calculateCargoResult as calcResult } from "@/lib/calculation";
 import { RupiahInput } from "@/components/RupiahInput";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 type Truck = {
   id: string;
@@ -21,6 +22,7 @@ type Cargo = {
   balen: string;
   balen_freight_cost: number;
   balen_cargo_type: string;
+  tanggal_balen: string;
   fuel: number;
   operational_cost: number;
   other_cost: number;
@@ -62,6 +64,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
     balen: "",
     balen_freight_cost: 0,
     balen_cargo_type: "",
+    tanggal_balen: "",
     fuel: 0,
     operational_cost: 0,
     other_cost: 0,
@@ -84,6 +87,9 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
 
   // Balen dropdown options
   const [balenList, setBalenList] = useState<{ id: string; name: string; balen_cargo_type: string; balen_freight_cost: number }[]>([]);
+
+  // Notes (order_notes) for dropdown
+  const [notesList, setNotesList] = useState<{ id: string; name: string; phone: string; description: string }[]>([]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -109,14 +115,17 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
   useEffect(() => {
     async function loadDropdownOptions() {
       try {
-        const [muatanRes, balenRes] = await Promise.all([
+        const [muatanRes, balenRes, notesRes] = await Promise.all([
           fetch("/api/settings/muatan-truk"),
           fetch("/api/settings/balen"),
+          fetch("/api/notes"),
         ]);
         const muatanJson = await muatanRes.json();
         const balenJson = await balenRes.json();
+        const notesJson = await notesRes.json();
         if (muatanJson.data) setMuatanTrukList(muatanJson.data);
         if (balenJson.data) setBalenList(balenJson.data);
+        if (notesJson.data) setNotesList(notesJson.data);
       } catch (err) {
         console.error("Failed to load dropdown options:", err);
       }
@@ -133,6 +142,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       balen: "",
       balen_freight_cost: 0,
       balen_cargo_type: "",
+      tanggal_balen: "",
       fuel: 0,
       operational_cost: 0,
       other_cost: 0,
@@ -177,6 +187,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       balen: cargo.balen,
       balen_freight_cost: cargo.balen_freight_cost,
       balen_cargo_type: cargo.balen_cargo_type,
+      tanggal_balen: cargo.tanggal_balen || "",
       fuel: cargo.fuel || 0,
       operational_cost: cargo.operational_cost || 0,
       other_cost: cargo.other_cost || 0,
@@ -380,11 +391,14 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <label className="mb-2 block text-sm text-zinc-300">Cargo (Muatan Truk)</label>
-              <select
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-200"
+              <SearchableSelect
+                options={muatanTrukList.map((m) => ({
+                  value: m.name,
+                  label: m.name,
+                  description: m.cargo_type ? `Type: ${m.cargo_type}` : undefined,
+                }))}
                 value={cargoForm.cargo}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
+                onChange={(selectedName) => {
                   const selected = muatanTrukList.find((m) => m.name === selectedName);
                   if (selected) {
                     setCargoForm({
@@ -397,12 +411,8 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                     setCargoForm({ ...cargoForm, cargo: selectedName });
                   }
                 }}
-              >
-                <option value="">-- Pilih Muatan --</option>
-                {muatanTrukList.map((m) => (
-                  <option key={m.id} value={m.name}>{m.name}</option>
-                ))}
-              </select>
+                placeholder="-- Pilih Muatan --"
+              />
             </div>
             <div>
               <RupiahInput
@@ -422,11 +432,14 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div>
               <label className="mb-2 block text-sm text-zinc-300">Balen (optional)</label>
-              <select
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-zinc-200"
+              <SearchableSelect
+                options={balenList.map((b) => ({
+                  value: b.name,
+                  label: b.name,
+                  description: b.balen_cargo_type ? `Type: ${b.balen_cargo_type}` : undefined,
+                }))}
                 value={cargoForm.balen}
-                onChange={(e) => {
-                  const selectedName = e.target.value;
+                onChange={(selectedName) => {
                   const selected = balenList.find((b) => b.name === selectedName);
                   if (selected) {
                     setCargoForm({
@@ -439,12 +452,8 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                     setCargoForm({ ...cargoForm, balen: selectedName });
                   }
                 }}
-              >
-                <option value="">-- Pilih Balen --</option>
-                {balenList.map((b) => (
-                  <option key={b.id} value={b.name}>{b.name}</option>
-                ))}
-              </select>
+                placeholder="-- Pilih Balen --"
+              />
             </div>
             <div>
               <RupiahInput
@@ -473,6 +482,15 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <div>
+              <label className="mb-2 block text-sm text-zinc-300">Tanggal Balen</label>
+              <input
+                type="date"
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                value={cargoForm.tanggal_balen}
+                onChange={(e) => setCargoForm({ ...cargoForm, tanggal_balen: e.target.value })}
+              />
+            </div>
+            <div>
               <RupiahInput
                 label="Fuel (IDR)"
                 value={cargoForm.fuel}
@@ -495,12 +513,38 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
             </div>
             <div className="sm:col-span-2">
               <label className="mb-2 block text-sm text-zinc-300">Notes</label>
-              <input
-                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
-                placeholder="Catatan"
-                value={cargoForm.notes}
-                onChange={(e) => setCargoForm({ ...cargoForm, notes: e.target.value })}
-              />
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                  placeholder="Catatan"
+                  value={cargoForm.notes}
+                  onChange={(e) => setCargoForm({ ...cargoForm, notes: e.target.value })}
+                />
+                {notesList.length > 0 && (
+                  <select
+                    className="rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 text-sm text-zinc-300"
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        const selected = notesList.find((n) => n.id === e.target.value);
+                        if (selected) {
+                          const noteText = cargoForm.notes
+                            ? `${cargoForm.notes}, ${selected.name} (${selected.phone})`
+                            : `${selected.name} (${selected.phone})`;
+                          setCargoForm({ ...cargoForm, notes: noteText });
+                        }
+                      }
+                    }}
+                  >
+                    <option value="">+ Order Notes</option>
+                    {notesList.map((n) => (
+                      <option key={n.id} value={n.id}>
+                        {n.name} - {n.phone}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             </div>
           </div>
           <div className="mt-4 flex gap-2">
@@ -535,6 +579,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                 <th className="px-3 py-3 text-center">Balen</th>
                 <th className="px-3 py-3 text-center">Balen Freight Cost</th>
                 <th className="px-3 py-3 text-center">Balen Cargo Type</th>
+                <th className="px-3 py-3 text-center">Tgl Balen</th>
                 <th className="px-3 py-3 text-center">Tanpa Balen</th>
                 <th className="px-3 py-3 text-center">Total</th>
                 <th className="px-3 py-3 text-center">Notes</th>
@@ -552,6 +597,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
                   <td className="px-3 py-3 text-center">{c.balen || "-"}</td>
                   <td className="px-3 py-3 text-center">{formatIDR(c.balen_freight_cost)}</td>
                   <td className="px-3 py-3 text-center">{c.balen_cargo_type || "-"}</td>
+                  <td className="px-3 py-3 text-center">{c.tanggal_balen || "-"}</td>
                   <td className="px-3 py-3 text-center">{c.tanpa_balen ? formatIDR(c.tanpa_balen) : "-"}</td>
                   <td className="px-3 py-3 text-center font-semibold text-amber-400">{c.total != null ? formatIDR(c.total) : "-"}</td>
                   <td className="px-3 py-3 text-center">{c.notes || "-"}</td>
@@ -590,7 +636,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               ))}
               {filteredAndSortedCargoList.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="px-4 py-6 text-center text-zinc-500">
+                  <td colSpan={13} className="px-4 py-6 text-center text-zinc-500">
                     {selectedMonth ? "Tidak ada cargo di bulan ini" : "Belum ada data cargo"}
                   </td>
                 </tr>
@@ -598,7 +644,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
               {/* Table Total Row */}
               {filteredAndSortedCargoList.length > 0 && (
                 <tr className="bg-zinc-800 border-t-2 border-zinc-600">
-                  <td colSpan={9} className="px-3 py-3 text-right font-bold">
+                  <td colSpan={10} className="px-3 py-3 text-right font-bold">
                     TOTAL {selectedMonth ? `(${selectedMonth})` : ""}:
                   </td>
                   <td className="px-3 py-3 text-center font-bold text-lg text-amber-400">

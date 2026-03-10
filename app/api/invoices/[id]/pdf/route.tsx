@@ -60,13 +60,31 @@ export async function GET(
       .select("*")
       .eq("invoice_id", id);
 
-    // Sort items by tanggal_item ascending (earlier dates first)
-    const sortedItems =
-      items?.sort((a, b) => {
+    // Sort items by tanggal_item ascending, empty rows go to end
+    const normalItems = (items || []).filter((it) => !it.is_empty_row);
+    const emptyRows = (items || []).filter((it) => it.is_empty_row);
+    const sortedItems = [
+      ...normalItems.sort((a, b) => {
         const dateA = a.tanggal_item ? new Date(a.tanggal_item).getTime() : 0;
         const dateB = b.tanggal_item ? new Date(b.tanggal_item).getTime() : 0;
         return dateA - dateB;
-      }) || [];
+      }),
+      ...emptyRows,
+    ];
+
+    // Build keterangan display text (append extra charge labels)
+    function getKeteranganDisplay(it: { keterangan?: string; extra_charges?: { amount: number; label: string }[] }): string {
+      const parts: string[] = [];
+      if (it.keterangan) parts.push(it.keterangan);
+      if (it.extra_charges && it.extra_charges.length > 0) {
+        for (const ec of it.extra_charges) {
+          if (ec.label || ec.amount) {
+            parts.push(`${ec.label || "Tambahan"}: ${idr(ec.amount)}`);
+          }
+        }
+      }
+      return parts.join("; ");
+    }
 
     // Check if there's any murti type item
     const hasMurtiType =
@@ -82,7 +100,9 @@ export async function GET(
       sortedItems?.reduce((sum, it) => sum + (it.kuli || 0), 0) || 0;
     const totalUangMakan =
       sortedItems?.reduce((sum, it) => sum + (it.uang_makan || 0), 0) || 0;
-    const grandTotal = subtotal + totalKuli + totalUangMakan;
+    const totalExtraCharges =
+      sortedItems?.reduce((sum, it) => sum + ((it.extra_charges || []) as { amount: number; label: string }[]).reduce((s: number, ec: { amount: number }) => s + (ec.amount || 0), 0), 0) || 0;
+    const grandTotal = subtotal + totalKuli + totalUangMakan + totalExtraCharges;
 
     const styles = StyleSheet.create({
       page: {
@@ -437,7 +457,42 @@ export async function GET(
               key={i}
               wrap={false}
             >
-              {hasJapfaType ? (
+              {it.is_empty_row ? (
+                // Render empty row as blank space
+                hasJapfaType ? (
+                  <>
+                    <Text style={styles.colTanggalJapfa}>{" "}</Text>
+                    <Text style={styles.colNopolJapfa}>{" "}</Text>
+                    <Text style={styles.colTujuanJapfa}>{" "}</Text>
+                    <Text style={styles.colJenisJapfa}>{" "}</Text>
+                    <Text style={styles.colOngkirJapfa}>{" "}</Text>
+                    <Text style={styles.colUangMakanJapfa}>{" "}</Text>
+                    <Text style={styles.colBeratJapfa}>{" "}</Text>
+                    <Text style={styles.colKeteranganJapfa}>{" "}</Text>
+                  </>
+                ) : hasMurtiType ? (
+                  <>
+                    <Text style={styles.colTanggalMurti}>{" "}</Text>
+                    <Text style={styles.colNopolMurti}>{" "}</Text>
+                    <Text style={styles.colTujuanMurti}>{" "}</Text>
+                    <Text style={styles.colOngkirMurti}>{" "}</Text>
+                    <Text style={styles.colKuliMurti}>{" "}</Text>
+                    <Text style={styles.colBeratMurti}>{" "}</Text>
+                    <Text style={styles.colKeteranganMurti}>{" "}</Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.colTanggal}>{" "}</Text>
+                    <Text style={styles.colNopol}>{" "}</Text>
+                    <Text style={styles.colTujuan}>{" "}</Text>
+                    <Text style={styles.colJenis}>{" "}</Text>
+                    <Text style={styles.colOngkir}>{" "}</Text>
+                    <Text style={styles.colKuli}>{" "}</Text>
+                    <Text style={styles.colBerat}>{" "}</Text>
+                    <Text style={styles.colKeterangan}>{" "}</Text>
+                  </>
+                )
+              ) : hasJapfaType ? (
                 <>
                   <Text style={styles.colTanggalJapfa}>
                     {formatDateDMY(it.tanggal_item)}
@@ -451,7 +506,7 @@ export async function GET(
                   </Text>
                   <Text style={styles.colBeratJapfa}>{it.berat}</Text>
                   <Text style={styles.colKeteranganJapfa}>
-                    {it.keterangan || ""}
+                    {getKeteranganDisplay(it)}
                   </Text>
                 </>
               ) : hasMurtiType ? (
@@ -467,7 +522,7 @@ export async function GET(
                   </Text>
                   <Text style={styles.colBeratMurti}>{it.berat}</Text>
                   <Text style={styles.colKeteranganMurti}>
-                    {it.keterangan || ""}
+                    {getKeteranganDisplay(it)}
                   </Text>
                 </>
               ) : (
@@ -484,7 +539,7 @@ export async function GET(
                   </Text>
                   <Text style={styles.colBerat}>{it.berat}</Text>
                   <Text style={styles.colKeterangan}>
-                    {it.keterangan || ""}
+                    {getKeteranganDisplay(it)}
                   </Text>
                 </>
               )}
@@ -537,6 +592,12 @@ export async function GET(
                 <View style={styles.totalRow}>
                   <Text style={styles.totalLabel}>Total Uang Makan:</Text>
                   <Text style={styles.totalValue}>{idr(totalUangMakan)}</Text>
+                </View>
+              )}
+              {totalExtraCharges > 0 && (
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>Total Tambahan:</Text>
+                  <Text style={styles.totalValue}>{idr(totalExtraCharges)}</Text>
                 </View>
               )}
               <View style={styles.totalRow}>

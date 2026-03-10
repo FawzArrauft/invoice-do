@@ -5,9 +5,17 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { NopolInput } from "@/components/NopolInput";
 import { IDRInput } from "@/components/IDRInput";
+import { SearchableSelect } from "@/components/SearchableSelect";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCirclePlus } from "@fortawesome/free-solid-svg-icons";
 
 
 type ItemType = "default" | "murti" | "japfa";
+
+type ExtraCharge = {
+  amount: number;
+  label: string;
+};
 
 type Item = {
   type: ItemType;
@@ -20,6 +28,8 @@ type Item = {
   uang_makan: number;
   keterangan: string;
   tanggal_item: string;
+  extra_charges: ExtraCharge[];
+  is_empty_row: boolean;
 };
 
 function formatIDR(n: number) {
@@ -46,7 +56,7 @@ export default function CreateInvoicePage() {
   const [kepadaYth, setKepadaYth] = useState("");
 
   const [items, setItems] = useState<Item[]>([
-    { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+    { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
   ]);
 
   // Ref for bottom "Add Row" button area
@@ -83,20 +93,29 @@ export default function CreateInvoicePage() {
   const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
   const [loadingPabrik, setLoadingPabrik] = useState(false);
 
+  // Order Notes state (informational - who ordered)
+  const [notesList, setNotesList] = useState<Array<{ id: string; name: string; phone: string; description: string }>>([]);
+  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+
   // Validation state
   const [validationErrors, setValidationErrors] = useState<{ kepadaYth?: string; tanggal?: string; signatureName?: string; items: Record<number, { nopol?: string; tujuan?: string }> }>({ items: {} });
   const [showValidation, setShowValidation] = useState(false);
 
-  // Load pabrik list on mount
+  // Load pabrik list and notes on mount
   useEffect(() => {
     async function loadPabrik() {
       setLoadingPabrik(true);
       try {
-        const res = await fetch("/api/settings/pabrik");
-        const json = await res.json();
-        if (json.data) setPabrikList(json.data);
+        const [pabrikRes, notesRes] = await Promise.all([
+          fetch("/api/settings/pabrik"),
+          fetch("/api/notes"),
+        ]);
+        const pabrikJson = await pabrikRes.json();
+        const notesJson = await notesRes.json();
+        if (pabrikJson.data) setPabrikList(pabrikJson.data);
+        if (notesJson.data) setNotesList(notesJson.data);
       } catch (err) {
-        console.error("Failed to load pabrik:", err);
+        console.error("Failed to load pabrik/notes:", err);
       } finally {
         setLoadingPabrik(false);
       }
@@ -262,7 +281,12 @@ export default function CreateInvoicePage() {
     [items],
   );
 
-  const total = totalOngkir + totalKuli + totalUangMakan;
+  const totalExtraCharges = useMemo(
+    () => items.reduce((sum, it) => sum + it.extra_charges.reduce((s, ec) => s + (Number(ec.amount) || 0), 0), 0),
+    [items],
+  );
+
+  const total = totalOngkir + totalKuli + totalUangMakan + totalExtraCharges;
 
   function updateItem(i: number, patch: Partial<Item>) {
     setItems((prev) =>
@@ -282,19 +306,54 @@ export default function CreateInvoicePage() {
     }
   }
 
+  // Helper: check if a row is "empty" (draft) — no meaningful data filled
+  function isRowEmpty(item: Item): boolean {
+    if (item.is_empty_row) return false; // empty rows are intentional
+    return (
+      !item.nopol.trim() &&
+      !item.tujuan.trim() &&
+      !item.jenis.trim() &&
+      item.ongkir === 0 &&
+      item.berat === 0 &&
+      item.kuli === 0 &&
+      item.uang_makan === 0 &&
+      !item.keterangan.trim() &&
+      item.extra_charges.length === 0
+    );
+  }
+
   function addRow() {
     const newIndex = items.length;
     setItems((prev) => [
       ...prev,
-      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
     ]);
-    // Auto-scroll to the new row's area
+    // Device-specific scroll behavior:
+    // Mobile (<768px): scroll to new row
+    // Tablet/Desktop (>=768px): no scroll, just focus first input
     setTimeout(() => {
       const newRowEl = itemRefs.current[newIndex];
       if (newRowEl) {
-        newRowEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          newRowEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        // Focus the first focusable input in the new row
+        const firstInput = newRowEl.querySelector<HTMLElement>(
+          'input, select, [tabindex]'
+        );
+        if (firstInput) {
+          firstInput.focus({ preventScroll: !isMobile });
+        }
       }
     }, 100);
+  }
+
+  function addEmptyRow() {
+    setItems((prev) => [
+      ...prev,
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: "", extra_charges: [], is_empty_row: true },
+    ]);
   }
 
   function removeRow(i: number) {
@@ -354,13 +413,15 @@ export default function CreateInvoicePage() {
   }
 
   async function saveInvoice() {
-    // Run validation first
+    // Run validation first — skip completely empty (draft) rows
     const errors: { kepadaYth?: string; tanggal?: string; signatureName?: string; items: Record<number, { nopol?: string; tujuan?: string }> } = { items: {} };
     if (!kepadaYth.trim()) errors.kepadaYth = "Kepada Yth wajib diisi";
     if (!tanggal.trim()) errors.tanggal = "Tanggal wajib diisi";
     if (!signatureName.trim()) errors.signatureName = "Nama tanda tangan wajib diisi";
 
     items.forEach((it, index) => {
+      // Skip validation for completely empty draft rows and intentional empty rows
+      if (isRowEmpty(it) || it.is_empty_row) return;
       const itemErrors: { nopol?: string; tujuan?: string } = {};
       if (!it.nopol.trim()) itemErrors.nopol = "NoPol wajib diisi";
       if (!it.tujuan.trim()) itemErrors.tujuan = "Tujuan wajib diisi";
@@ -393,11 +454,14 @@ export default function CreateInvoicePage() {
       return;
     }
 
+    // Filter out completely empty draft rows before saving (keep intentional empty rows)
+    const nonEmptyItems = items.filter((it) => !isRowEmpty(it));
+
     const payload = {
       invoiceNumber,
       tanggal,
       kepadaYth,
-      items: items.map((it) => ({
+      items: nonEmptyItems.map((it) => ({
         type: it.type || "default",
         nopol: it.nopol || "",
         tujuan: it.tujuan || "",
@@ -408,6 +472,8 @@ export default function CreateInvoicePage() {
         uang_makan: Number(it.uang_makan) || 0,
         keterangan: it.keterangan || "",
         tanggal_item: it.tanggal_item || new Date().toISOString().slice(0, 10),
+        extra_charges: it.extra_charges || [],
+        is_empty_row: it.is_empty_row || false,
       })),
       footerTanggal,
       bankName,
@@ -433,17 +499,17 @@ export default function CreateInvoicePage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Create Invoice</h1>
           <p className="text-sm text-zinc-400">
-            Dark modern • mobile friendly • IDR
+            Dark modern &bull; mobile friendly &bull; IDR
           </p>
         </div>
         <a
           href="/invoices"
-          className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm"
+          className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm hover:bg-zinc-900 transition-colors"
         >
           Invoice List
         </a>
@@ -451,11 +517,11 @@ export default function CreateInvoicePage() {
 
       {/* Header */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Invoice Number (optional)">
             <input
               className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-              placeholder="Leave empty for auto (INV-YYYY-0001)"
+              placeholder="Auto (INV-YYYY-0001)"
               value={invoiceNumber}
               onChange={(e) => setInvoiceNumber(e.target.value)}
             />
@@ -491,36 +557,142 @@ export default function CreateInvoicePage() {
             />
           </Field>
         </div>
+
+        {/* Order Notes - Informational only (siapa yang order) */}
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <label className="mb-2 block text-sm text-zinc-300 font-medium">Order Notes (Info saja, tidak di-export)</label>
+          <select
+            className="w-full sm:w-auto sm:min-w-[300px] rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm"
+            value=""
+            onChange={(e) => {
+              if (e.target.value) {
+                const selected = notesList.find((n) => n.id === e.target.value);
+                if (selected && !selectedNotes.find((sn) => sn.id === selected.id)) {
+                  setSelectedNotes((prev) => [...prev, { id: selected.id, name: selected.name, phone: selected.phone }]);
+                }
+              }
+            }}
+          >
+            <option value="">-- Pilih Order Notes --</option>
+            {notesList.map((n) => (
+              <option key={n.id} value={n.id}>
+                {n.name} - {n.phone}{n.description ? ` (${n.description})` : ""}
+              </option>
+            ))}
+          </select>
+          {selectedNotes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedNotes.map((sn) => (
+                <span
+                  key={sn.id}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 px-3 py-1 text-xs text-blue-300"
+                >
+                  {sn.name} ({sn.phone})
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNotes((prev) => prev.filter((n) => n.id !== sn.id))}
+                    className="text-blue-400 hover:text-blue-200"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Items */}
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold">Items</h2>
-          <button
-            onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
-          >
-            + Add Row
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={addEmptyRow}
+              className="rounded-xl border border-dashed border-zinc-600 text-zinc-400 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-900 transition-colors"
+            >
+              + Empty Row
+            </button>
+            <button
+              onClick={addRow}
+              className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
+            >
+              + Add Row
+            </button>
+          </div>
         </div>
 
-        <div className="space-y-3">
-          {items.map((it, i) => (
+        <div className="space-y-4">
+          {items.map((it, i) => {
+            const isDraft = isRowEmpty(it);
+            if (it.is_empty_row) {
+              return (
+                <div
+                  key={i}
+                  ref={(el) => { itemRefs.current[i] = el; }}
+                  className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/20 p-3 sm:p-4 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-zinc-800 border border-zinc-700 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                      Empty Row
+                    </span>
+                    <span className="text-[11px] text-zinc-500">Row kosong untuk cetak PDF</span>
+                  </div>
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            }
+            return (
             <div
               key={i}
               ref={(el) => { itemRefs.current[i] = el; }}
-              className={`rounded-2xl border ${showValidation && validationErrors.items[i] ? 'border-red-500/50' : 'border-zinc-800'} bg-zinc-950/40 p-3 sm:p-4`}
+              className={`rounded-2xl border ${
+                showValidation && validationErrors.items[i]
+                  ? 'border-red-500/50'
+                  : isDraft
+                  ? 'border-amber-500/30'
+                  : 'border-zinc-800'
+              } ${isDraft ? 'bg-amber-950/5' : 'bg-zinc-950/40'} p-4 sm:p-5`}
             >
-              {/* Validation error banner for this row */}
+              {/* Row header: badge + row number + remove */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-zinc-500 bg-zinc-800/50 rounded-lg px-2 py-0.5">
+                    Row {i + 1}
+                  </span>
+                  {isDraft && (
+                    <span className="inline-flex items-center rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-amber-400">
+                      Draft
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => removeRow(i)}
+                  className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/30 hover:border-red-500/30 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+
+              {isDraft && (
+                <p className="text-[11px] text-zinc-500 mb-3">Row kosong — isi minimal 1 field untuk menyimpan</p>
+              )}
+
+              {/* Validation error banner */}
               {showValidation && validationErrors.items[i] && (
-                <div className="mb-2 rounded-lg bg-red-950/30 border border-red-500/30 px-3 py-1.5 text-xs text-red-400">
+                <div className="mb-3 rounded-lg bg-red-950/30 border border-red-500/30 px-3 py-1.5 text-xs text-red-400">
                   {Object.values(validationErrors.items[i]).join(" \u2022 ")}
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                {/* Type Selector */}
-                <div className="sm:col-span-2">
+
+              {/* Row 1: Tipe, Tanggal, NoPol, Pabrik */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div>
                   <Label>Tipe</Label>
                   <select
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -540,7 +712,7 @@ export default function CreateInvoicePage() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <Label>Tanggal</Label>
                   <input
                     type="date"
@@ -552,7 +724,7 @@ export default function CreateInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-3">
+                <div>
                   <Label>NoPol *</Label>
                   <div className={showValidation && validationErrors.items[i]?.nopol ? 'rounded-xl ring-1 ring-red-500' : ''}>
                     <NopolInput
@@ -562,74 +734,71 @@ export default function CreateInvoicePage() {
                   </div>
                 </div>
 
-                {/* Pabrik Selector */}
-                <div className="sm:col-span-2">
+                <div>
                   <Label>Pabrik</Label>
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    defaultValue=""
+                  <SearchableSelect
+                    options={pabrikList.map((p) => ({
+                      value: p.id,
+                      label: p.name,
+                      description: p.tujuan ? `→ ${p.tujuan}` : undefined,
+                    }))}
+                    value=""
+                    onChange={(val) => handlePabrikChange(i, val)}
+                    placeholder={loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
                     disabled={loadingPabrik}
-                    onChange={(e) => handlePabrikChange(i, e.target.value)}
-                  >
-                    <option value="" disabled>
-                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
-                    </option>
-                    {pabrikList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    loading={loadingPabrik}
+                  />
                 </div>
+              </div>
 
-                <div className="sm:col-span-2">
+              {/* Row 2: Tujuan, Jenis, Ongkir, Berat/Kuli/UangMakan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div>
                   <Label>Tujuan *</Label>
                   <input
-                    className={`w-full rounded-xl border ${showValidation && validationErrors.items[i]?.tujuan ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3`}
+                    className={`w-full rounded-xl border ${showValidation && validationErrors.items[i]?.tujuan ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
                     value={it.tujuan}
                     readOnly={it.type === "japfa"}
                     onChange={(e) => updateItem(i, { tujuan: e.target.value })}
                   />
                 </div>
 
-                {/* Jenis - Show for Default and Japfa type */}
                 {(it.type === "default" || it.type === "japfa") && (
-                  <div className="sm:col-span-2">
-                    <Label>Jenis *</Label>
+                  <div>
+                    <Label>Jenis</Label>
                     <input
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
                       value={it.jenis}
                       onChange={(e) => updateItem(i, { jenis: e.target.value })}
                     />
                   </div>
                 )}
 
-                <div className="sm:col-span-2">
-                  <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : it.type === "japfa" ? "Ongkir (IDR)" : "Ongkir (IDR)"}</Label>
+                <div>
+                  <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : "Ongkir (IDR)"}</Label>
                   <IDRInput
                     value={it.ongkir}
                     onChange={(val) => updateItem(i, { ongkir: val })}
                   />
                 </div>
 
-                {/* Berat - Show for Default type (before Kuli) */}
-                {it.type === "default" && (
-                  <div className="sm:col-span-2">
-                    <Label>Berat</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                      value={it.berat}
-                      onChange={(e) =>
-                        updateItem(i, { berat: Number(e.target.value || 0) })
-                      }
-                    />
-                  </div>
-                )}
+                <div>
+                  <Label>Berat</Label>
+                  <input
+                    inputMode="numeric"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    value={it.berat}
+                    onChange={(e) =>
+                      updateItem(i, { berat: Number(e.target.value || 0) })
+                    }
+                  />
+                </div>
+              </div>
 
-                {/* Kuli - Show for non-Japfa types */}
+              {/* Row 3: Kuli/UangMakan, Keterangan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {it.type !== "japfa" && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <Label>Kuli (IDR)</Label>
                     <IDRInput
                       value={it.kuli}
@@ -638,9 +807,8 @@ export default function CreateInvoicePage() {
                   </div>
                 )}
 
-                {/* Uang Makan - Show only for Japfa type */}
                 {it.type === "japfa" && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <Label>Uang Makan (IDR)</Label>
                     <IDRInput
                       value={it.uang_makan}
@@ -649,22 +817,7 @@ export default function CreateInvoicePage() {
                   </div>
                 )}
 
-                {/* Berat - Show for Murti/Japfa type (after Kuli) */}
-                {(it.type === "murti" || it.type === "japfa") && (
-                  <div className="sm:col-span-2">
-                    <Label>Berat</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                      value={it.berat}
-                      onChange={(e) =>
-                        updateItem(i, { berat: Number(e.target.value || 0) })
-                      }
-                    />
-                  </div>
-                )}
-
-                <div className="sm:col-span-2">
+                <div className={it.type === "japfa" || it.type === "murti" ? "sm:col-span-1 lg:col-span-3" : "sm:col-span-1 lg:col-span-3"}>
                   <Label>Keterangan</Label>
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -674,62 +827,126 @@ export default function CreateInvoicePage() {
                     }
                   />
                 </div>
+              </div>
 
-                <div className="sm:col-span-2 flex sm:flex-col items-center justify-between gap-5">
-                  <span className="text-xs text-zinc-400 sm:mt-7">
-                    Row {i + 1}
-                  </span>
+              {/* Extra Charges */}
+              <div className="mt-3 pt-3 border-t border-zinc-800/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-zinc-400">Biaya Tambahan</span>
                   <button
-                    onClick={() => removeRow(i)}
-                    className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+                    type="button"
+                    onClick={() => {
+                      const updated = [...it.extra_charges, { amount: 0, label: "" }];
+                      updateItem(i, { extra_charges: updated });
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    title="Tambah biaya lainnya"
                   >
-                    Remove
+                    <FontAwesomeIcon icon={faCirclePlus} className="w-3.5 h-3.5" />
+                    Tambah
                   </button>
                 </div>
+                {it.extra_charges.length > 0 && (
+                  <div className="space-y-2">
+                    {it.extra_charges.map((ec, ecIdx) => (
+                      <div key={ecIdx} className="flex items-center gap-2">
+                        <input
+                          className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-zinc-600"
+                          placeholder="Keterangan (mis: Kuli tambahan)"
+                          value={ec.label}
+                          onChange={(e) => {
+                            const updated = [...it.extra_charges];
+                            updated[ecIdx] = { ...updated[ecIdx], label: e.target.value };
+                            updateItem(i, { extra_charges: updated });
+                          }}
+                        />
+                        <div className="w-36 sm:w-44">
+                          <IDRInput
+                            value={ec.amount}
+                            onChange={(val) => {
+                              const updated = [...it.extra_charges];
+                              updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                              updateItem(i, { extra_charges: updated });
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
+                            updateItem(i, { extra_charges: updated });
+                          }}
+                          className="rounded-lg border border-zinc-800 px-2 py-2 text-xs text-red-400 hover:bg-red-950/30 transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="text-right text-xs text-zinc-400">
+                      Subtotal tambahan: Rp {formatIDR(it.extra_charges.reduce((s, ec) => s + (Number(ec.amount) || 0), 0))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
-        {/* Bottom Add Row button - avoids scrolling back up */}
-        <div ref={bottomAddRowRef} className="mt-3 flex justify-end">
+        {/* Bottom Add Row button */}
+        <div ref={bottomAddRowRef} className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={addEmptyRow}
+            className="rounded-xl border border-dashed border-zinc-600 text-zinc-400 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-900 transition-colors"
+          >
+            + Empty Row
+          </button>
           <button
             onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+            className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
           >
             + Add Row
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400">Total Ongkir</span>
-            <span className="text-sm">Rp {formatIDR(totalOngkir)}</span>
-          </div>
-          {totalKuli > 0 && (
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <div className="ml-auto max-w-sm flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Total Kuli</span>
-              <span className="text-sm">Rp {formatIDR(totalKuli)}</span>
+              <span className="text-sm text-zinc-400">Total Ongkir</span>
+              <span className="text-sm font-mono">Rp {formatIDR(totalOngkir)}</span>
             </div>
-          )}
-          {totalUangMakan > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Total Uang Makan</span>
-              <span className="text-sm">Rp {formatIDR(totalUangMakan)}</span>
+            {totalKuli > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Kuli</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalKuli)}</span>
+              </div>
+            )}
+            {totalUangMakan > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Uang Makan</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalUangMakan)}</span>
+              </div>
+            )}
+            {totalExtraCharges > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Tambahan</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalExtraCharges)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-zinc-700 pt-2 mt-1">
+              <span className="text-sm text-zinc-300 font-semibold">GRAND TOTAL</span>
+              <span className="text-lg font-bold font-mono">Rp {formatIDR(total)}</span>
             </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400 font-semibold">GRAND TOTAL</span>
-            <span className="text-lg font-semibold">Rp {formatIDR(total)}</span>
           </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
-        <h2 className="font-semibold mb-3">Footer</h2>
+        <h2 className="font-semibold mb-4">Footer</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Bank & Tanggal */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Field label="Footer Tanggal">
             <input
               type="date"
@@ -757,151 +974,154 @@ export default function CreateInvoicePage() {
               <button
                 type="button"
                 onClick={() => setShowAddBank(!showAddBank)}
-                className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
               >
                 {showAddBank ? "×" : "+"}
               </button>
             </div>
           </Field>
 
-          {/* Add New Bank Form */}
-          {showAddBank && (
-            <div className="sm:col-span-2 rounded-xl border border-zinc-700 bg-zinc-900/50 p-4 space-y-3">
-              <h3 className="text-sm font-medium text-zinc-300">Tambah Bank Baru (Terenkripsi)</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                  placeholder="Nama Bank (BCA, Mandiri, dll)"
-                  value={newBankName}
-                  onChange={(e) => setNewBankName(e.target.value)}
-                />
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                  placeholder="No Rekening"
-                  value={newNoRekening}
-                  onChange={(e) => setNewNoRekening(e.target.value)}
-                />
-                <input
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                  placeholder="Nama Pemilik Rekening"
-                  value={newAccountName}
-                  onChange={(e) => setNewAccountName(e.target.value)}
-                />
-              </div>
-              <button
-                type="button"
-                onClick={saveNewBank}
-                disabled={savingBank}
-                className="rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {savingBank ? "Menyimpan..." : "Simpan Bank (Encrypted)"}
-              </button>
-            </div>
-          )}
-
           <Field label="No Rekening">
             <input
               readOnly
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 opacity-70"
+              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none opacity-70"
               placeholder="Pilih bank dari dropdown"
               value={noRekening}
             />
           </Field>
+        </div>
 
+        {/* Add New Bank Form */}
+        {showAddBank && (
+          <div className="mt-4 rounded-xl border border-zinc-700 bg-zinc-900/50 p-4 space-y-3">
+            <h3 className="text-sm font-medium text-zinc-300">Tambah Bank Baru (Terenkripsi)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                placeholder="Nama Bank (BCA, Mandiri, dll)"
+                value={newBankName}
+                onChange={(e) => setNewBankName(e.target.value)}
+              />
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                placeholder="No Rekening"
+                value={newNoRekening}
+                onChange={(e) => setNewNoRekening(e.target.value)}
+              />
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                placeholder="Nama Pemilik Rekening"
+                value={newAccountName}
+                onChange={(e) => setNewAccountName(e.target.value)}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={saveNewBank}
+              disabled={savingBank}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            >
+              {savingBank ? "Menyimpan..." : "Simpan Bank (Encrypted)"}
+            </button>
+          </div>
+        )}
+
+        {/* Nama Rekening */}
+        <div className="mt-4">
           <Field label="Nama Rekening (A/N)">
             <input
               readOnly
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 opacity-70"
+              className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none opacity-70"
               placeholder="Pilih bank dari dropdown"
               value={namaRekening}
             />
           </Field>
+        </div>
 
-          {/* Signature Section */}
-          <div className="sm:col-span-2 space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-sm text-zinc-300 font-medium">Tanda Tangan</label>
-              {defaultSignatureUrl && (
-                <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={useDefaultSignature}
-                    onChange={(e) => setUseDefaultSignature(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-900"
-                  />
-                  Gunakan tanda tangan default
-                </label>
-              )}
-            </div>
-
-            {useDefaultSignature && defaultSignatureUrl ? (
-              <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4">
-                <p className="text-xs text-zinc-400 mb-2">Tanda Tangan Default</p>
-                <img
-                  src={defaultSignatureUrl}
-                  alt="default signature"
-                  className="h-20 object-contain"
+        {/* Signature Section */}
+        <div className="mt-6 pt-4 border-t border-zinc-800 space-y-4">
+          <div className="flex items-center justify-between">
+            <label className="text-sm text-zinc-300 font-medium">Tanda Tangan</label>
+            {defaultSignatureUrl && (
+              <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useDefaultSignature}
+                  onChange={(e) => setUseDefaultSignature(e.target.checked)}
+                  className="rounded border-zinc-700 bg-zinc-900"
                 />
-                <p className="text-sm text-zinc-300 mt-2">{defaultSignatureName}</p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) uploadSignature(f);
-                    }}
-                    className="block w-full text-sm text-zinc-300
-                               file:mr-4 file:rounded-xl file:border-0
-                               file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
-                  />
-                  {uploading && (
-                    <span className="text-xs text-zinc-400">Uploading…</span>
-                  )}
-                </div>
-
-                {signatureUrl && (
-                  <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-3">
-                    <img
-                      src={signatureUrl}
-                      alt="signature"
-                      className="h-20 object-contain"
-                    />
-                    <p className="text-xs text-zinc-400 mt-2">Uploaded</p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="mb-2 block text-sm text-zinc-300">Nama di bawah tanda tangan</label>
-                  <input
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    placeholder="Nama lengkap"
-                    value={signatureName}
-                    onChange={(e) => setSignatureName(e.target.value)}
-                  />
-                </div>
-
-                {signatureUrl && (
-                  <button
-                    type="button"
-                    onClick={saveAsDefaultSignature}
-                    disabled={savingDefault}
-                    className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50"
-                  >
-                    {savingDefault ? "Menyimpan..." : "Simpan sebagai tanda tangan default"}
-                  </button>
-                )}
-              </>
+                Gunakan tanda tangan default
+              </label>
             )}
           </div>
-          </div>
+
+          {useDefaultSignature && defaultSignatureUrl ? (
+            <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 max-w-sm">
+              <p className="text-xs text-zinc-400 mb-2">Tanda Tangan Default</p>
+              <img
+                src={defaultSignatureUrl}
+                alt="default signature"
+                className="h-20 object-contain"
+              />
+              <p className="text-sm text-zinc-300 mt-2">{defaultSignatureName}</p>
+            </div>
+          ) : (
+            <div className="max-w-lg space-y-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) uploadSignature(f);
+                  }}
+                  className="block w-full text-sm text-zinc-300
+                             file:mr-4 file:rounded-xl file:border-0
+                             file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
+                />
+                {uploading && (
+                  <span className="text-xs text-zinc-400">Uploading…</span>
+                )}
+              </div>
+
+              {signatureUrl && (
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-3">
+                  <img
+                    src={signatureUrl}
+                    alt="signature"
+                    className="h-20 object-contain"
+                  />
+                  <p className="text-xs text-zinc-400 mt-2">Uploaded</p>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-2 block text-sm text-zinc-300">Nama di bawah tanda tangan</label>
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  placeholder="Nama lengkap"
+                  value={signatureName}
+                  onChange={(e) => setSignatureName(e.target.value)}
+                />
+              </div>
+
+              {signatureUrl && (
+                <button
+                  type="button"
+                  onClick={saveAsDefaultSignature}
+                  disabled={savingDefault}
+                  className="rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                >
+                  {savingDefault ? "Menyimpan..." : "Simpan sebagai tanda tangan default"}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
 
         <button
           onClick={saveInvoice}
-          className="mt-6 w-full sm:w-auto rounded-xl bg-white text-zinc-950 px-6 py-3 font-medium"
+          className="mt-6 w-full sm:w-auto rounded-xl bg-white text-zinc-950 px-8 py-3 font-medium hover:bg-zinc-200 transition-colors"
         >
           Save Invoice
         </button>

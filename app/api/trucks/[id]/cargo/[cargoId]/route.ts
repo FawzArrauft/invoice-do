@@ -10,6 +10,7 @@ const CargoUpdateSchema = z.object({
   balen: z.string().optional(),
   balen_freight_cost: z.number().nonnegative().optional(),
   balen_cargo_type: z.string().optional(),
+  tanggal_balen: z.string().optional(),
   fuel: z.number().nonnegative().optional(),
   operational_cost: z.number().nonnegative().optional(),
   other_cost: z.number().nonnegative().optional(),

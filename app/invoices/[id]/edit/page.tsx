@@ -5,8 +5,16 @@ import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { NopolInput } from "@/components/NopolInput";
 import { IDRInput } from "@/components/IDRInput";
+import { SearchableSelect } from "@/components/SearchableSelect";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faCirclePlus } from "@fortawesome/free-solid-svg-icons";
 
 type ItemType = "default" | "murti" | "japfa";
+
+type ExtraCharge = {
+  amount: number;
+  label: string;
+};
 
 type Item = {
   id?: string;
@@ -20,6 +28,8 @@ type Item = {
   uang_makan: number;
   keterangan: string;
   tanggal_item: string;
+  extra_charges: ExtraCharge[];
+  is_empty_row: boolean;
 };
 
 type InvoiceData = {
@@ -130,8 +140,10 @@ export default function EditInvoicePage() {
                 uang_makan: it.uang_makan || 0,
                 keterangan: it.keterangan || "",
                 tanggal_item: it.tanggal_item || "",
+                extra_charges: it.extra_charges || [],
+                is_empty_row: it.is_empty_row || false,
               }))
-            : [{ type: "default" as ItemType, nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: "" }]
+            : [{ type: "default" as ItemType, nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: "", extra_charges: [], is_empty_row: false }]
         );
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : "Error loading invoice");
@@ -186,6 +198,7 @@ export default function EditInvoicePage() {
     if (!signatureName.trim()) errors.signatureName = "Nama tanda tangan wajib diisi";
 
     items.forEach((it, index) => {
+      if (it.is_empty_row) return; // skip empty rows
       const itemErrors: { nopol?: string; tujuan?: string } = {};
       if (!it.nopol.trim()) itemErrors.nopol = "NoPol wajib diisi";
       if (!it.tujuan.trim()) itemErrors.tujuan = "Tujuan wajib diisi";
@@ -202,15 +215,20 @@ export default function EditInvoicePage() {
     return !!errors.kepadaYth || !!errors.tanggal || !!errors.signatureName || Object.keys(errors.items).length > 0;
   }
 
-  // Sort items by tanggal_item for display (earlier dates first)
+  // Sort items by tanggal_item for display (earlier dates first), empty rows at end
   const sortedItemsWithIndex = useMemo(() => {
-    return items
+    const normal = items
       .map((item, originalIndex) => ({ item, originalIndex }))
+      .filter(({ item }) => !item.is_empty_row)
       .sort((a, b) => {
         const dateA = a.item.tanggal_item ? new Date(a.item.tanggal_item).getTime() : 0;
         const dateB = b.item.tanggal_item ? new Date(b.item.tanggal_item).getTime() : 0;
         return dateA - dateB;
       });
+    const empty = items
+      .map((item, originalIndex) => ({ item, originalIndex }))
+      .filter(({ item }) => item.is_empty_row);
+    return [...normal, ...empty];
   }, [items]);
 
   const totalOngkir = useMemo(
@@ -228,7 +246,12 @@ export default function EditInvoicePage() {
     [items]
   );
 
-  const total = totalOngkir + totalKuli + totalUangMakan;
+  const totalExtraCharges = useMemo(
+    () => items.reduce((sum, it) => sum + it.extra_charges.reduce((s, ec) => s + (Number(ec.amount) || 0), 0), 0),
+    [items]
+  );
+
+  const total = totalOngkir + totalKuli + totalUangMakan + totalExtraCharges;
 
   function updateItem(i: number, patch: Partial<Item>) {
     setItems((prev) =>
@@ -252,15 +275,21 @@ export default function EditInvoicePage() {
     const newIndex = items.length;
     setItems((prev) => [
       ...prev,
-      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10) },
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
     ]);
-    // Auto-scroll to the new row's date field area
     setTimeout(() => {
       const newRowEl = itemRefs.current[newIndex];
       if (newRowEl) {
         newRowEl.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 100);
+  }
+
+  function addEmptyRow() {
+    setItems((prev) => [
+      ...prev,
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: "", extra_charges: [], is_empty_row: true },
+    ]);
   }
 
   function removeRow(i: number) {
@@ -331,6 +360,8 @@ export default function EditInvoicePage() {
         uang_makan: Number(it.uang_makan) || 0,
         keterangan: it.keterangan || "",
         tanggal_item: it.tanggal_item || "",
+        extra_charges: it.extra_charges || [],
+        is_empty_row: it.is_empty_row || false,
       })),
       footerTanggal,
       bankName,
@@ -364,7 +395,7 @@ export default function EditInvoicePage() {
   if (error) return <div className="p-6">Error: {error}</div>;
 
   return (
-    <div className="mx-auto max-w-5xl p-4 sm:p-6">
+    <div className="mx-auto max-w-6xl p-4 sm:p-6">
       <div className="flex items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Edit Invoice</h1>
@@ -380,7 +411,7 @@ export default function EditInvoicePage() {
 
       {/* Header */}
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Invoice Number">
             <input
               className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -426,30 +457,77 @@ export default function EditInvoicePage() {
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">Items</h2>
-          <button
-            onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
-          >
-            + Add Row
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={addEmptyRow}
+              className="rounded-xl border border-dashed border-zinc-600 text-zinc-400 px-4 py-2 text-sm font-medium hover:bg-zinc-900"
+            >
+              + Empty Row
+            </button>
+            <button
+              onClick={addRow}
+              className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+            >
+              + Add Row
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3">
-          {sortedItemsWithIndex.map(({ item: it, originalIndex: i }, displayIndex) => (
+          {sortedItemsWithIndex.map(({ item: it, originalIndex: i }, displayIndex) => {
+            if (it.is_empty_row) {
+              return (
+                <div
+                  key={i}
+                  ref={(el) => { itemRefs.current[i] = el; }}
+                  className="rounded-2xl border border-dashed border-zinc-700 bg-zinc-950/20 p-3 sm:p-4 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-zinc-800 border border-zinc-700 px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider text-zinc-400">
+                      Empty Row
+                    </span>
+                    <span className="text-[11px] text-zinc-500">Row kosong untuk cetak PDF</span>
+                  </div>
+                  <button
+                    onClick={() => removeRow(i)}
+                    className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+                  >
+                    Remove
+                  </button>
+                </div>
+              );
+            }
+            return (
             <div
               key={i}
               ref={(el) => { itemRefs.current[i] = el; }}
-              className={`rounded-2xl border ${showValidation && validationErrors.items[i] ? 'border-red-500/50' : 'border-zinc-800'} bg-zinc-950/40 p-3 sm:p-4`}
+              className={`rounded-2xl border ${showValidation && validationErrors.items[i] ? 'border-red-500/50' : 'border-zinc-800'} bg-zinc-950/40 p-4 sm:p-5`}
             >
-              {/* Validation error banner for this row */}
+              {/* Row header: badge + row number + remove */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-zinc-500 bg-zinc-800/50 rounded-lg px-2 py-0.5">
+                    Row {displayIndex + 1}
+                  </span>
+                </div>
+                <button
+                  onClick={() => removeRow(i)}
+                  className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950/30 hover:border-red-500/30 transition-colors"
+                >
+                  Remove
+                </button>
+              </div>
+
+              {/* Validation error banner */}
               {showValidation && validationErrors.items[i] && (
-                <div className="mb-2 rounded-lg bg-red-950/30 border border-red-500/30 px-3 py-1.5 text-xs text-red-400">
-                  {Object.values(validationErrors.items[i]).join(" • ")}
+                <div className="mb-3 rounded-lg bg-red-950/30 border border-red-500/30 px-3 py-1.5 text-xs text-red-400">
+                  {Object.values(validationErrors.items[i]).join(" \u2022 ")}
                 </div>
               )}
-              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-                {/* Type Selector */}
-                <div className="sm:col-span-2">
+
+              {/* Row 1: Tipe, Tanggal, NoPol, Pabrik */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div>
                   <Label>Tipe</Label>
                   <select
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -469,7 +547,7 @@ export default function EditInvoicePage() {
                   </select>
                 </div>
 
-                <div className="sm:col-span-2">
+                <div>
                   <Label>Tanggal</Label>
                   <input
                     type="date"
@@ -481,7 +559,7 @@ export default function EditInvoicePage() {
                   />
                 </div>
 
-                <div className="sm:col-span-3">
+                <div>
                   <Label>NoPol *</Label>
                   <div className={showValidation && validationErrors.items[i]?.nopol ? 'rounded-xl ring-1 ring-red-500' : ''}>
                     <NopolInput
@@ -491,49 +569,47 @@ export default function EditInvoicePage() {
                   </div>
                 </div>
 
-                {/* Pabrik Selector */}
-                <div className="sm:col-span-2">
+                <div>
                   <Label>Pabrik</Label>
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    defaultValue=""
+                  <SearchableSelect
+                    options={pabrikList.map((p) => ({
+                      value: p.id,
+                      label: p.name,
+                      description: p.tujuan ? `→ ${p.tujuan}` : undefined,
+                    }))}
+                    value=""
+                    onChange={(val) => handlePabrikChange(i, val)}
+                    placeholder={loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
                     disabled={loadingPabrik}
-                    onChange={(e) => handlePabrikChange(i, e.target.value)}
-                  >
-                    <option value="" disabled>
-                      {loadingPabrik ? "Loading..." : "-- Pilih Pabrik --"}
-                    </option>
-                    {pabrikList.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    loading={loadingPabrik}
+                  />
                 </div>
+              </div>
 
-                <div className="sm:col-span-2">
+              {/* Row 2: Tujuan, Jenis, Ongkir, Berat */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
+                <div>
                   <Label>Tujuan *</Label>
                   <input
-                    className={`w-full rounded-xl border ${showValidation && validationErrors.items[i]?.tujuan ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3`}
+                    className={`w-full rounded-xl border ${showValidation && validationErrors.items[i]?.tujuan ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
                     value={it.tujuan}
                     readOnly={it.type === "japfa"}
                     onChange={(e) => updateItem(i, { tujuan: e.target.value })}
                   />
                 </div>
 
-                {/* Jenis - Show for Default and Japfa type */}
                 {(it.type === "default" || it.type === "japfa") && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <Label>Jenis</Label>
                     <input
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
                       value={it.jenis}
                       onChange={(e) => updateItem(i, { jenis: e.target.value })}
                     />
                   </div>
                 )}
 
-                <div className="sm:col-span-2">
+                <div>
                   <Label>{it.type === "murti" ? "Biaya Kirim (IDR)" : "Ongkir (IDR)"}</Label>
                   <IDRInput
                     value={it.ongkir}
@@ -541,24 +617,23 @@ export default function EditInvoicePage() {
                   />
                 </div>
 
-                {/* Berat - Show for Default type (before Kuli) */}
-                {it.type === "default" && (
-                  <div className="sm:col-span-2">
-                    <Label>Berat</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                      value={it.berat}
-                      onChange={(e) =>
-                        updateItem(i, { berat: Number(e.target.value || 0) })
-                      }
-                    />
-                  </div>
-                )}
+                <div>
+                  <Label>Berat</Label>
+                  <input
+                    inputMode="numeric"
+                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                    value={it.berat}
+                    onChange={(e) =>
+                      updateItem(i, { berat: Number(e.target.value || 0) })
+                    }
+                  />
+                </div>
+              </div>
 
-                {/* Kuli - Show for non-Japfa types */}
+              {/* Row 3: Kuli/UangMakan, Keterangan */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {it.type !== "japfa" && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <Label>Kuli (IDR)</Label>
                     <IDRInput
                       value={it.kuli}
@@ -567,9 +642,8 @@ export default function EditInvoicePage() {
                   </div>
                 )}
 
-                {/* Uang Makan - Show only for Japfa type */}
                 {it.type === "japfa" && (
-                  <div className="sm:col-span-2">
+                  <div>
                     <Label>Uang Makan (IDR)</Label>
                     <IDRInput
                       value={it.uang_makan}
@@ -578,22 +652,7 @@ export default function EditInvoicePage() {
                   </div>
                 )}
 
-                {/* Berat - Show for Murti/Japfa type (after Kuli) */}
-                {(it.type === "murti" || it.type === "japfa") && (
-                  <div className="sm:col-span-2">
-                    <Label>Berat</Label>
-                    <input
-                      inputMode="numeric"
-                      className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                      value={it.berat}
-                      onChange={(e) =>
-                        updateItem(i, { berat: Number(e.target.value || 0) })
-                      }
-                    />
-                  </div>
-                )}
-
-                <div className="sm:col-span-2">
+                <div className="sm:col-span-1 lg:col-span-3">
                   <Label>Keterangan</Label>
                   <input
                     className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
@@ -603,62 +662,126 @@ export default function EditInvoicePage() {
                     }
                   />
                 </div>
+              </div>
 
-                <div className="sm:col-span-2 flex sm:flex-col items-center justify-between gap-5">
-                  <span className="text-xs text-zinc-400 sm:mt-7">
-                    Row {displayIndex + 1}
-                  </span>
+              {/* Extra Charges */}
+              <div className="mt-3 pt-3 border-t border-zinc-800/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-medium text-zinc-400">Biaya Tambahan</span>
                   <button
-                    onClick={() => removeRow(i)}
-                    className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-900"
+                    type="button"
+                    onClick={() => {
+                      const updated = [...it.extra_charges, { amount: 0, label: "" }];
+                      updateItem(i, { extra_charges: updated });
+                    }}
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                    title="Tambah biaya lainnya"
                   >
-                    Remove
+                    <FontAwesomeIcon icon={faCirclePlus} className="w-3.5 h-3.5" />
+                    Tambah
                   </button>
                 </div>
+                {it.extra_charges.length > 0 && (
+                  <div className="space-y-2">
+                    {it.extra_charges.map((ec, ecIdx) => (
+                      <div key={ecIdx} className="flex items-center gap-2">
+                        <input
+                          className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-zinc-600"
+                          placeholder="Keterangan (mis: Kuli tambahan)"
+                          value={ec.label}
+                          onChange={(e) => {
+                            const updated = [...it.extra_charges];
+                            updated[ecIdx] = { ...updated[ecIdx], label: e.target.value };
+                            updateItem(i, { extra_charges: updated });
+                          }}
+                        />
+                        <div className="w-36 sm:w-44">
+                          <IDRInput
+                            value={ec.amount}
+                            onChange={(val) => {
+                              const updated = [...it.extra_charges];
+                              updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                              updateItem(i, { extra_charges: updated });
+                            }}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
+                            updateItem(i, { extra_charges: updated });
+                          }}
+                          className="rounded-lg border border-zinc-800 px-2 py-2 text-xs text-red-400 hover:bg-red-950/30"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    <div className="text-right text-xs text-zinc-400">
+                      Subtotal tambahan: Rp {formatIDR(it.extra_charges.reduce((s, ec) => s + (Number(ec.amount) || 0), 0))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          ))}
+          );
+          })}
         </div>
 
-        {/* Bottom Add Row button - avoids scrolling back up */}
-        <div ref={bottomAddRowRef} className="mt-3 flex justify-end">
+        {/* Bottom Add Row button */}
+        <div ref={bottomAddRowRef} className="mt-4 flex justify-end gap-2">
+          <button
+            onClick={addEmptyRow}
+            className="rounded-xl border border-dashed border-zinc-600 text-zinc-400 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-900 transition-colors"
+          >
+            + Empty Row
+          </button>
           <button
             onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+            className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
           >
             + Add Row
           </button>
         </div>
 
-        <div className="mt-4 flex flex-col gap-1 border-t border-zinc-800 pt-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400">Total Ongkir</span>
-            <span className="text-sm">Rp {formatIDR(totalOngkir)}</span>
-          </div>
-          {totalKuli > 0 && (
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <div className="ml-auto max-w-sm flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Total Kuli</span>
-              <span className="text-sm">Rp {formatIDR(totalKuli)}</span>
+              <span className="text-sm text-zinc-400">Total Ongkir</span>
+              <span className="text-sm font-mono">Rp {formatIDR(totalOngkir)}</span>
             </div>
-          )}
-          {totalUangMakan > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-zinc-400">Total Uang Makan</span>
-              <span className="text-sm">Rp {formatIDR(totalUangMakan)}</span>
+            {totalKuli > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Kuli</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalKuli)}</span>
+              </div>
+            )}
+            {totalUangMakan > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Uang Makan</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalUangMakan)}</span>
+              </div>
+            )}
+            {totalExtraCharges > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-zinc-400">Total Tambahan</span>
+                <span className="text-sm font-mono">Rp {formatIDR(totalExtraCharges)}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between border-t border-zinc-700 pt-2 mt-1">
+              <span className="text-sm text-zinc-300 font-semibold">GRAND TOTAL</span>
+              <span className="text-lg font-bold font-mono">Rp {formatIDR(total)}</span>
             </div>
-          )}
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-zinc-400 font-semibold">GRAND TOTAL</span>
-            <span className="text-lg font-semibold">Rp {formatIDR(total)}</span>
           </div>
         </div>
       </div>
 
       {/* Footer */}
       <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
-        <h2 className="font-semibold mb-3">Footer</h2>
+        <h2 className="font-semibold mb-4">Footer</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Bank & Tanggal */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Field label="Footer Tanggal">
             <input
               type="date"
@@ -685,20 +808,25 @@ export default function EditInvoicePage() {
               onChange={(e) => setNoRekening(e.target.value)}
             />
           </Field>
+        </div>
 
+        {/* Nama Rekening */}
+        <div className="mt-4">
           <Field label="Nama Rekening (A/N)">
             <input
-              className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+              className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
               placeholder="Nama Pemilik Rekening"
               value={namaRekening}
               onChange={(e) => setNamaRekening(e.target.value)}
             />
           </Field>
+        </div>
 
-          {/* Signature Section */}
-          <div className="sm:col-span-2 space-y-4">
-            <label className="text-sm text-zinc-300 font-medium">Tanda Tangan</label>
+        {/* Signature Section */}
+        <div className="mt-6 pt-4 border-t border-zinc-800 space-y-4">
+          <label className="text-sm text-zinc-300 font-medium">Tanda Tangan</label>
 
+          <div className="max-w-lg space-y-4">
             <div className="flex items-center gap-3">
               <input
                 type="file"
@@ -751,13 +879,13 @@ export default function EditInvoicePage() {
           <button
             onClick={saveInvoice}
             disabled={saving}
-            className="rounded-xl bg-white text-zinc-950 px-6 py-3 font-medium disabled:opacity-50"
+            className="rounded-xl bg-white text-zinc-950 px-8 py-3 font-medium disabled:opacity-50 hover:bg-zinc-200 transition-colors"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>
           <a
             href="/invoices"
-            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-3 font-medium"
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-6 py-3 font-medium hover:bg-zinc-800 transition-colors"
           >
             Cancel
           </a>

@@ -1,18 +1,43 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [error, setError] = useState("");
   const router = useRouter();
+  const hasRedirected = useRef(false);
 
-  // Prefetch dashboard untuk navigasi lebih cepat
+  // Check existing session on mount — auto-redirect if valid
   useEffect(() => {
+    let cancelled = false;
+
+    async function checkSession() {
+      try {
+        const res = await fetch("/api/auth/check");
+        const data = await res.json();
+        if (!cancelled && data.authenticated && !hasRedirected.current) {
+          hasRedirected.current = true;
+          // Session still valid — go straight to dashboard
+          window.location.replace("/");
+          return;
+        }
+      } catch {
+        // Network error — show login form
+      } finally {
+        if (!cancelled) setCheckingSession(false);
+      }
+    }
+
+    checkSession();
+    // Prefetch dashboard for fast navigation after login
     router.prefetch("/");
+
+    return () => { cancelled = true; };
   }, [router]);
 
   async function onLogin(e: React.FormEvent) {
@@ -33,14 +58,26 @@ export default function LoginPage() {
         throw new Error(data.error || "Login gagal");
       }
 
-      // Gunakan replace + refresh agar middleware langsung baca cookie baru
-      router.replace("/");
-      router.refresh();
+      // Immediate redirect to dashboard — window.location ensures cookies are sent
+      hasRedirected.current = true;
+      window.location.replace("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login gagal");
     } finally {
       setLoading(false);
     }
+  }
+
+  // Show loading spinner while checking session
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-zinc-600 border-t-white" />
+          <p className="text-sm text-zinc-400">Memeriksa sesi...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -68,6 +105,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            autoComplete="email"
           />
 
           <input
@@ -77,6 +115,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            autoComplete="current-password"
           />
         </div>
 
