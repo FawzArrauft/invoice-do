@@ -6,7 +6,7 @@ export async function GET() {
   const { data, error } = await sb
     .from("invoices")
     .select(
-      "id, created_at, invoice_number, is_manual, tanggal, kepada_yth, total_ongkir"
+      "id, created_at, invoice_number, is_manual, tanggal, kepada_yth, total_ongkir, updated_at, order_notes"
     )
     .order("created_at", { ascending: false })
     .limit(100);

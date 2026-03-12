@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 
 const TruckSchema = z.object({
   nopol: z.string().min(1),
+  keterangan: z.string().optional().default(""),
+  nama_supir: z.string().optional().default(""),
 });
 
 // GET all trucks with cargo count
@@ -52,6 +54,8 @@ export async function POST(req: Request) {
     .from("trucks")
     .insert({
       nopol: parsed.data.nopol.toUpperCase(),
+      keterangan: parsed.data.keterangan || "",
+      nama_supir: parsed.data.nama_supir || "",
     })
     .select()
     .single();

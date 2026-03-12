@@ -2,10 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { NopolInput } from "@/components/NopolInput";
 
 type Truck = {
   id: string;
   nopol: string;
+  keterangan: string;
+  nama_supir: string;
   created_at: string;
   cargo_count?: number;
   status?: string;
@@ -16,12 +19,16 @@ export default function MuatanPage() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [nopol, setNopol] = useState("");
+  const [formKeterangan, setFormKeterangan] = useState("");
+  const [formNamaSupir, setFormNamaSupir] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Edit states
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editNopol, setEditNopol] = useState("");
+  const [editKeterangan, setEditKeterangan] = useState("");
+  const [editNamaSupir, setEditNamaSupir] = useState("");
 
   async function fetchTrucks() {
     setLoading(true);
@@ -48,10 +55,12 @@ export default function MuatanPage() {
       const res = await fetch("/api/trucks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nopol }),
+        body: JSON.stringify({ nopol, keterangan: formKeterangan, nama_supir: formNamaSupir }),
       });
       if (res.ok) {
         setNopol("");
+        setFormKeterangan("");
+        setFormNamaSupir("");
         setShowForm(false);
         fetchTrucks();
       } else {
@@ -90,7 +99,7 @@ export default function MuatanPage() {
       const res = await fetch(`/api/trucks/${editingId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nopol: editNopol }),
+        body: JSON.stringify({ nopol: editNopol, keterangan: editKeterangan, nama_supir: editNamaSupir }),
       });
 
       if (res.ok) {
@@ -111,6 +120,8 @@ export default function MuatanPage() {
     e.stopPropagation();
     setEditingId(truck.id);
     setEditNopol(truck.nopol);
+    setEditKeterangan(truck.keterangan || "");
+    setEditNamaSupir(truck.nama_supir || "");
   }
 
   function cancelEdit(e: React.MouseEvent) {
@@ -118,6 +129,8 @@ export default function MuatanPage() {
     e.stopPropagation();
     setEditingId(null);
     setEditNopol("");
+    setEditKeterangan("");
+    setEditNamaSupir("");
   }
 
   async function handleToggleStatus(e: React.MouseEvent, truck: Truck) {
@@ -146,9 +159,14 @@ export default function MuatanPage() {
   if (loading) return <div className="p-6">Loading...</div>;
 
   // Filter trucks based on search query
-  const filteredTrucks = trucks.filter((t) =>
-    t.nopol.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTrucks = trucks.filter((t) => {
+    const q = searchQuery.toLowerCase();
+    return (
+      t.nopol.toLowerCase().includes(q) ||
+      (t.keterangan || "").toLowerCase().includes(q) ||
+      (t.nama_supir || "").toLowerCase().includes(q)
+    );
+  });
 
   // Group trucks by status
   const orderGroup = filteredTrucks.filter((t) => t.status === "ordering");
@@ -170,11 +188,24 @@ export default function MuatanPage() {
       >
         {isEditing ? (
           <div onClick={(e) => e.stopPropagation()}>
-            <input
-              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-lg font-semibold mb-2"
+            <label className="mb-1 block text-xs text-zinc-400">Nopol</label>
+            <NopolInput
               value={editNopol}
-              onChange={(e) => setEditNopol(e.target.value.toUpperCase())}
-              autoFocus
+              onChange={(v) => setEditNopol(v)}
+            />
+            <label className="mt-2 mb-1 block text-xs text-zinc-400">Keterangan (Nama Truck)</label>
+            <input
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm mb-2"
+              placeholder="Cth: Colt Diesel Engkel"
+              value={editKeterangan}
+              onChange={(e) => setEditKeterangan(e.target.value)}
+            />
+            <label className="mb-1 block text-xs text-zinc-400">Nama Supir</label>
+            <input
+              className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm mb-2"
+              placeholder="Cth: Pak Budi"
+              value={editNamaSupir}
+              onChange={(e) => setEditNamaSupir(e.target.value)}
             />
             <div className="flex gap-2 mt-2">
               <button
@@ -199,6 +230,12 @@ export default function MuatanPage() {
                 <div className="text-lg font-semibold group-hover:text-current transition-colors">
                   {truck.nopol}
                 </div>
+                {truck.keterangan && (
+                  <div className="text-xs text-zinc-400 mt-0.5">{truck.keterangan}</div>
+                )}
+                {truck.nama_supir && (
+                  <div className="text-xs text-blue-400 mt-0.5">Supir: {truck.nama_supir}</div>
+                )}
                 <div className="text-xs text-zinc-500 mt-1">
                   Added: {new Date(truck.created_at).toLocaleDateString("id-ID")}
                 </div>
@@ -327,16 +364,36 @@ export default function MuatanPage() {
       {showForm && (
         <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
           <h2 className="font-semibold mb-4">Tambah Truck Baru</h2>
-          <div className="flex gap-4">
-            <div className="flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
               <label className="mb-2 block text-sm text-zinc-300">
                 Nopol (License Plate) *
               </label>
+              <NopolInput
+                value={nopol}
+                onChange={(v) => setNopol(v)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300">
+                Keterangan (Nama Truck)
+              </label>
               <input
                 className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                placeholder="AG 1234 BC"
-                value={nopol}
-                onChange={(e) => setNopol(e.target.value.toUpperCase())}
+                placeholder="Cth: Colt Diesel Engkel"
+                value={formKeterangan}
+                onChange={(e) => setFormKeterangan(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm text-zinc-300">
+                Nama Supir
+              </label>
+              <input
+                className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                placeholder="Cth: Pak Budi"
+                value={formNamaSupir}
+                onChange={(e) => setFormNamaSupir(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddTruck()}
               />
             </div>

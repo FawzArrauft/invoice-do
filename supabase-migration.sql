@@ -25,7 +25,17 @@ CREATE INDEX IF NOT EXISTS idx_order_notes_created_at ON order_notes(created_at 
 ALTER TABLE truck_cargo
   ADD COLUMN IF NOT EXISTS tanggal_balen TEXT DEFAULT '';
 
--- 5. RLS (Row Level Security) - opsional, aktifkan jika menggunakan RLS
+-- 5. Tambah kolom updated_at dan order_notes pada invoices
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NULL,
+  ADD COLUMN IF NOT EXISTS order_notes JSONB DEFAULT '[]'::jsonb;
+
+-- 6. Tambah kolom keterangan dan nama_supir pada trucks
+ALTER TABLE trucks
+  ADD COLUMN IF NOT EXISTS keterangan TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS nama_supir TEXT DEFAULT '';
+
+-- 7. RLS (Row Level Security) - opsional, aktifkan jika menggunakan RLS
 -- ALTER TABLE order_notes ENABLE ROW LEVEL SECURITY;
 -- CREATE POLICY "Allow all for authenticated" ON order_notes
 --   FOR ALL USING (true) WITH CHECK (true);

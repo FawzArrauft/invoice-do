@@ -34,6 +34,11 @@ const UpdateBodySchema = z.object({
   namaRekening: z.string().optional().default(""),
   signatureUrl: z.string().optional(),
   signatureName: z.string(),
+  orderNotes: z.array(z.object({
+    id: z.string(),
+    name: z.string(),
+    phone: z.string(),
+  })).optional().default([]),
 });
 
 export async function GET(
@@ -115,6 +120,8 @@ export async function PUT(
         account_name: data.namaRekening,
         signature_url: data.signatureUrl,
         signature_name: data.signatureName,
+        order_notes: data.orderNotes || [],
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id);
 

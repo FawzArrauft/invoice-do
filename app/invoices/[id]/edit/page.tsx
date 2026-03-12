@@ -43,6 +43,7 @@ type InvoiceData = {
   account_name: string;
   signature_url: string;
   signature_name: string;
+  order_notes: Array<{ id: string; name: string; phone: string }> | null;
   items: Item[];
 };
 
@@ -99,6 +100,13 @@ export default function EditInvoicePage() {
   const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
   const [loadingPabrik, setLoadingPabrik] = useState(false);
 
+  // Truck list for NoPol dropdown
+  const [truckList, setTruckList] = useState<Array<{ id: string; nopol: string; keterangan?: string; nama_supir?: string }>>([]);
+
+  // Order Notes state
+  const [notesList, setNotesList] = useState<Array<{ id: string; name: string; phone: string; description: string }>>([]);
+  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+
   // Refs for auto-scroll
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
@@ -125,6 +133,7 @@ export default function EditInvoicePage() {
         setNamaRekening(inv.account_name || "");
         setSignatureName(inv.signature_name || "");
         setSignatureUrl(inv.signature_url || "");
+        if (inv.order_notes) setSelectedNotes(inv.order_notes);
 
         setItems(
           inv.items?.length > 0
@@ -157,21 +166,29 @@ export default function EditInvoicePage() {
     }
   }, [invoiceId]);
 
-  // Load pabrik list on mount
+  // Load pabrik list, trucks, and notes on mount
   useEffect(() => {
-    async function loadPabrik() {
+    async function loadData() {
       setLoadingPabrik(true);
       try {
-        const res = await fetch("/api/settings/pabrik");
-        const json = await res.json();
-        if (json.data) setPabrikList(json.data);
+        const [pabrikRes, trucksRes, notesRes] = await Promise.all([
+          fetch("/api/settings/pabrik"),
+          fetch("/api/trucks"),
+          fetch("/api/notes"),
+        ]);
+        const pabrikJson = await pabrikRes.json();
+        const trucksJson = await trucksRes.json();
+        const notesJson = await notesRes.json();
+        if (pabrikJson.data) setPabrikList(pabrikJson.data);
+        if (trucksJson.data) setTruckList(trucksJson.data.map((t: { id: string; nopol: string; keterangan?: string; nama_supir?: string }) => ({ id: t.id, nopol: t.nopol, keterangan: t.keterangan || "", nama_supir: t.nama_supir || "" })));
+        if (notesJson.data) setNotesList(notesJson.data);
       } catch (err) {
-        console.error("Failed to load pabrik:", err);
+        console.error("Failed to load data:", err);
       } finally {
         setLoadingPabrik(false);
       }
     }
-    loadPabrik();
+    loadData();
   }, []);
 
   // Handle pabrik selection for a specific item
@@ -369,6 +386,7 @@ export default function EditInvoicePage() {
       namaRekening,
       signatureUrl,
       signatureName,
+      orderNotes: selectedNotes,
     };
 
     setSaving(true);
@@ -450,6 +468,45 @@ export default function EditInvoicePage() {
               }}
             />
           </Field>
+        </div>
+
+        {/* Order Notes */}
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <label className="mb-2 block text-sm text-zinc-300 font-medium">Order Notes (Info saja)</label>
+          <SearchableSelect
+            options={notesList.map((n) => ({
+              value: n.id,
+              label: `${n.name} - ${n.phone}`,
+              description: n.description || undefined,
+            }))}
+            value=""
+            onChange={(val) => {
+              const selected = notesList.find((n) => n.id === val);
+              if (selected && !selectedNotes.find((sn) => sn.id === selected.id)) {
+                setSelectedNotes((prev) => [...prev, { id: selected.id, name: selected.name, phone: selected.phone }]);
+              }
+            }}
+            placeholder="-- Cari & Pilih Order Notes --"
+          />
+          {selectedNotes.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {selectedNotes.map((sn) => (
+                <span
+                  key={sn.id}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/15 border border-blue-500/30 px-3 py-1 text-xs text-blue-300"
+                >
+                  {sn.name} ({sn.phone})
+                  <button
+                    type="button"
+                    onClick={() => setSelectedNotes((prev) => prev.filter((n) => n.id !== sn.id))}
+                    className="text-blue-400 hover:text-blue-200"
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -565,6 +622,7 @@ export default function EditInvoicePage() {
                     <NopolInput
                       value={it.nopol}
                       onChange={(val) => updateItem(i, { nopol: val })}
+                      trucks={truckList}
                     />
                   </div>
                 </div>
@@ -684,9 +742,9 @@ export default function EditInvoicePage() {
                 {it.extra_charges.length > 0 && (
                   <div className="space-y-2">
                     {it.extra_charges.map((ec, ecIdx) => (
-                      <div key={ecIdx} className="flex items-center gap-2">
+                      <div key={ecIdx} className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <input
-                          className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-zinc-600"
+                          className="w-full sm:flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm outline-none focus:border-zinc-600"
                           placeholder="Keterangan (mis: Kuli tambahan)"
                           value={ec.label}
                           onChange={(e) => {
@@ -695,26 +753,28 @@ export default function EditInvoicePage() {
                             updateItem(i, { extra_charges: updated });
                           }}
                         />
-                        <div className="w-36 sm:w-44">
-                          <IDRInput
-                            value={ec.amount}
-                            onChange={(val) => {
-                              const updated = [...it.extra_charges];
-                              updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0 sm:w-44 sm:flex-none">
+                            <IDRInput
+                              value={ec.amount}
+                              onChange={(val) => {
+                                const updated = [...it.extra_charges];
+                                updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                                updateItem(i, { extra_charges: updated });
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
                               updateItem(i, { extra_charges: updated });
                             }}
-                          />
+                            className="shrink-0 rounded-lg border border-zinc-800 px-2.5 py-2.5 text-xs text-red-400 hover:bg-red-950/30"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
-                            updateItem(i, { extra_charges: updated });
-                          }}
-                          className="rounded-lg border border-zinc-800 px-2 py-2 text-xs text-red-400 hover:bg-red-950/30"
-                        >
-                          ✕
-                        </button>
                       </div>
                     ))}
                     <div className="text-right text-xs text-zinc-400">

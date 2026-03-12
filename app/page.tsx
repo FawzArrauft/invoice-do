@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { NopolInput } from "@/components/NopolInput";
@@ -51,13 +51,30 @@ type Pabrik = {
 export default function CreateInvoicePage() {
   const router = useRouter();
   const { showToast } = useToast();
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [tanggal, setTanggal] = useState(new Date().toISOString().slice(0, 10));
-  const [kepadaYth, setKepadaYth] = useState("");
 
-  const [items, setItems] = useState<Item[]>([
-    { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
-  ]);
+  // --- Form data cache (sessionStorage) ---
+  const CACHE_KEY = "create-invoice-draft";
+  const isMountedRef = useRef(false);
+
+  function loadCache() {
+    try {
+      const cached = sessionStorage.getItem(CACHE_KEY);
+      if (cached) return JSON.parse(cached);
+    } catch { /* ignore */ }
+    return null;
+  }
+
+  const cached = useRef(typeof window !== "undefined" ? loadCache() : null);
+
+  const [invoiceNumber, setInvoiceNumber] = useState(cached.current?.invoiceNumber ?? "");
+  const [tanggal, setTanggal] = useState(cached.current?.tanggal ?? new Date().toISOString().slice(0, 10));
+  const [kepadaYth, setKepadaYth] = useState(cached.current?.kepadaYth ?? "");
+
+  const [items, setItems] = useState<Item[]>(
+    cached.current?.items ?? [
+      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
+    ]
+  );
 
   // Ref for bottom "Add Row" button area
   const bottomAddRowRef = useRef<HTMLDivElement | null>(null);
@@ -66,13 +83,13 @@ export default function CreateInvoicePage() {
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const [footerTanggal, setFooterTanggal] = useState(
-    new Date().toISOString().slice(0, 10),
+    cached.current?.footerTanggal ?? new Date().toISOString().slice(0, 10),
   );
-  const [bankName, setBankName] = useState("");
-  const [noRekening, setNoRekening] = useState("");
-  const [namaRekening, setNamaRekening] = useState("");
-  const [signatureName, setSignatureName] = useState("");
-  const [signatureUrl, setSignatureUrl] = useState("");
+  const [bankName, setBankName] = useState(cached.current?.bankName ?? "");
+  const [noRekening, setNoRekening] = useState(cached.current?.noRekening ?? "");
+  const [namaRekening, setNamaRekening] = useState(cached.current?.namaRekening ?? "");
+  const [signatureName, setSignatureName] = useState(cached.current?.signatureName ?? "");
+  const [signatureUrl, setSignatureUrl] = useState(cached.current?.signatureUrl ?? "");
   const [uploading, setUploading] = useState(false);
   const [useDefaultSignature, setUseDefaultSignature] = useState(true);
   const [defaultSignatureUrl, setDefaultSignatureUrl] = useState("");
@@ -82,7 +99,7 @@ export default function CreateInvoicePage() {
   // Bank dropdown state
   const [bankList, setBankList] = useState<Array<{ id: string; name: string; noRekening: string; accountName: string }>>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [selectedBankId, setSelectedBankId] = useState("");
+  const [selectedBankId, setSelectedBankId] = useState(cached.current?.selectedBankId ?? "");
   const [showAddBank, setShowAddBank] = useState(false);
   const [newBankName, setNewBankName] = useState("");
   const [newNoRekening, setNewNoRekening] = useState("");
@@ -93,34 +110,61 @@ export default function CreateInvoicePage() {
   const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
   const [loadingPabrik, setLoadingPabrik] = useState(false);
 
+  // Truck list for NoPol dropdown
+  const [truckList, setTruckList] = useState<Array<{ id: string; nopol: string; keterangan?: string; nama_supir?: string }>>([]);
+
   // Order Notes state (informational - who ordered)
   const [notesList, setNotesList] = useState<Array<{ id: string; name: string; phone: string; description: string }>>([]);
-  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>([]);
+  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>(cached.current?.selectedNotes ?? []);
 
   // Validation state
   const [validationErrors, setValidationErrors] = useState<{ kepadaYth?: string; tanggal?: string; signatureName?: string; items: Record<number, { nopol?: string; tujuan?: string }> }>({ items: {} });
   const [showValidation, setShowValidation] = useState(false);
 
-  // Load pabrik list and notes on mount
+  // --- Persist form data to sessionStorage ---
+  const saveCache = useCallback(() => {
+    try {
+      const data = {
+        invoiceNumber, tanggal, kepadaYth, items, footerTanggal,
+        bankName, noRekening, namaRekening, signatureName, signatureUrl,
+        selectedBankId, selectedNotes,
+      };
+      sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    } catch { /* quota exceeded or private mode */ }
+  }, [invoiceNumber, tanggal, kepadaYth, items, footerTanggal, bankName, noRekening, namaRekening, signatureName, signatureUrl, selectedBankId, selectedNotes]);
+
   useEffect(() => {
-    async function loadPabrik() {
+    if (!isMountedRef.current) { isMountedRef.current = true; return; }
+    saveCache();
+  }, [saveCache]);
+
+  function clearCache() {
+    try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
+  }
+
+  // Load pabrik list, notes, and trucks on mount
+  useEffect(() => {
+    async function loadData() {
       setLoadingPabrik(true);
       try {
-        const [pabrikRes, notesRes] = await Promise.all([
+        const [pabrikRes, notesRes, trucksRes] = await Promise.all([
           fetch("/api/settings/pabrik"),
           fetch("/api/notes"),
+          fetch("/api/trucks"),
         ]);
         const pabrikJson = await pabrikRes.json();
         const notesJson = await notesRes.json();
+        const trucksJson = await trucksRes.json();
         if (pabrikJson.data) setPabrikList(pabrikJson.data);
         if (notesJson.data) setNotesList(notesJson.data);
+        if (trucksJson.data) setTruckList(trucksJson.data.map((t: { id: string; nopol: string; keterangan?: string; nama_supir?: string }) => ({ id: t.id, nopol: t.nopol, keterangan: t.keterangan || "", nama_supir: t.nama_supir || "" })));
       } catch (err) {
-        console.error("Failed to load pabrik/notes:", err);
+        console.error("Failed to load data:", err);
       } finally {
         setLoadingPabrik(false);
       }
     }
-    loadPabrik();
+    loadData();
   }, []);
 
   // Handle pabrik selection for a specific item
@@ -481,6 +525,7 @@ export default function CreateInvoicePage() {
       namaRekening,
       signatureUrl,
       signatureName,
+      orderNotes: selectedNotes,
     };
 
     const res = await fetch("/api/invoices/create", {
@@ -495,6 +540,7 @@ export default function CreateInvoicePage() {
       return;
     }
     showToast("Invoice berhasil disimpan!", "success");
+    clearCache();
     router.push("/invoices");
   }
 
@@ -561,25 +607,23 @@ export default function CreateInvoicePage() {
         {/* Order Notes - Informational only (siapa yang order) */}
         <div className="mt-4 border-t border-zinc-800 pt-4">
           <label className="mb-2 block text-sm text-zinc-300 font-medium">Order Notes (Info saja, tidak di-export)</label>
-          <select
-            className="w-full sm:w-auto sm:min-w-[300px] rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm"
-            value=""
-            onChange={(e) => {
-              if (e.target.value) {
-                const selected = notesList.find((n) => n.id === e.target.value);
+          <div className="w-full sm:w-auto sm:min-w-[300px]">
+            <SearchableSelect
+              options={notesList.map((n) => ({
+                value: n.id,
+                label: `${n.name} - ${n.phone}`,
+                description: n.description || undefined,
+              }))}
+              value=""
+              onChange={(val) => {
+                const selected = notesList.find((n) => n.id === val);
                 if (selected && !selectedNotes.find((sn) => sn.id === selected.id)) {
                   setSelectedNotes((prev) => [...prev, { id: selected.id, name: selected.name, phone: selected.phone }]);
                 }
-              }
-            }}
-          >
-            <option value="">-- Pilih Order Notes --</option>
-            {notesList.map((n) => (
-              <option key={n.id} value={n.id}>
-                {n.name} - {n.phone}{n.description ? ` (${n.description})` : ""}
-              </option>
-            ))}
-          </select>
+              }}
+              placeholder="-- Cari & Pilih Order Notes --"
+            />
+          </div>
           {selectedNotes.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-2">
               {selectedNotes.map((sn) => (
@@ -730,6 +774,7 @@ export default function CreateInvoicePage() {
                     <NopolInput
                       value={it.nopol}
                       onChange={(val) => updateItem(i, { nopol: val })}
+                      trucks={truckList}
                     />
                   </div>
                 </div>
@@ -849,9 +894,9 @@ export default function CreateInvoicePage() {
                 {it.extra_charges.length > 0 && (
                   <div className="space-y-2">
                     {it.extra_charges.map((ec, ecIdx) => (
-                      <div key={ecIdx} className="flex items-center gap-2">
+                      <div key={ecIdx} className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <input
-                          className="flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-zinc-600"
+                          className="w-full sm:flex-1 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2.5 text-sm outline-none focus:border-zinc-600"
                           placeholder="Keterangan (mis: Kuli tambahan)"
                           value={ec.label}
                           onChange={(e) => {
@@ -860,26 +905,28 @@ export default function CreateInvoicePage() {
                             updateItem(i, { extra_charges: updated });
                           }}
                         />
-                        <div className="w-36 sm:w-44">
-                          <IDRInput
-                            value={ec.amount}
-                            onChange={(val) => {
-                              const updated = [...it.extra_charges];
-                              updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 min-w-0 sm:w-44 sm:flex-none">
+                            <IDRInput
+                              value={ec.amount}
+                              onChange={(val) => {
+                                const updated = [...it.extra_charges];
+                                updated[ecIdx] = { ...updated[ecIdx], amount: val };
+                                updateItem(i, { extra_charges: updated });
+                              }}
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
                               updateItem(i, { extra_charges: updated });
                             }}
-                          />
+                            className="shrink-0 rounded-lg border border-zinc-800 px-2.5 py-2.5 text-xs text-red-400 hover:bg-red-950/30 transition-colors"
+                          >
+                            ✕
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const updated = it.extra_charges.filter((_, idx) => idx !== ecIdx);
-                            updateItem(i, { extra_charges: updated });
-                          }}
-                          className="rounded-lg border border-zinc-800 px-2 py-2 text-xs text-red-400 hover:bg-red-950/30 transition-colors"
-                        >
-                          ✕
-                        </button>
                       </div>
                     ))}
                     <div className="text-right text-xs text-zinc-400">

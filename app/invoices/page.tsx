@@ -12,6 +12,8 @@ type Invoice = {
   tanggal: string;
   kepada_yth: string;
   total_ongkir: number;
+  updated_at: string | null;
+  order_notes: Array<{ id: string; name: string; phone: string }> | null;
 };
 
 type InvoiceDetail = {
@@ -365,6 +367,15 @@ export default function InvoicesPage() {
                 <div className="text-sm text-zinc-400 mt-1">
                   {formatDateDMY(inv.tanggal)} &bull; {inv.kepada_yth}
                 </div>
+                {inv.order_notes && inv.order_notes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {inv.order_notes.map((note) => (
+                      <span key={note.id} className="inline-flex items-center rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300">
+                        {note.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </button>
               
               <div className="flex items-center justify-between">
@@ -381,6 +392,11 @@ export default function InvoicesPage() {
                       minute: '2-digit'
                     })}
                   </div>
+                  {inv.updated_at && (
+                    <div className="text-[10px] text-amber-400/70 mt-0.5">
+                      Updated: {new Date(inv.updated_at).toLocaleString("id-ID", { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-1.5">
                   <EditButton invoiceId={inv.id} />
@@ -416,6 +432,15 @@ export default function InvoicesPage() {
                 <div className="text-sm text-zinc-400">
                   {formatDateDMY(inv.tanggal)} &bull; {inv.kepada_yth}
                 </div>
+                {inv.order_notes && inv.order_notes.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {inv.order_notes.map((note) => (
+                      <span key={note.id} className="inline-flex items-center rounded-full bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 text-[10px] text-blue-300">
+                        {note.name} ({note.phone})
+                      </span>
+                    ))}
+                  </div>
+                )}
               </button>
               <div className="flex items-center gap-4">
                 <div className="text-right">
@@ -425,6 +450,11 @@ export default function InvoicesPage() {
                   <div className="text-xs text-zinc-500">
                     {new Date(inv.created_at).toLocaleString("id-ID")}
                   </div>
+                  {inv.updated_at && (
+                    <div className="text-[10px] text-amber-400/70 mt-0.5">
+                      Updated: {new Date(inv.updated_at).toLocaleString("id-ID")}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <EditButton invoiceId={inv.id} />

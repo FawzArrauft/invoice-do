@@ -58,11 +58,13 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { nopol, status } = body;
+    const { nopol, status, keterangan, nama_supir } = body;
 
     const updateData: Record<string, string> = {};
     if (nopol) updateData.nopol = nopol;
     if (status) updateData.status = status;
+    if (keterangan !== undefined) updateData.keterangan = keterangan;
+    if (nama_supir !== undefined) updateData.nama_supir = nama_supir;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
