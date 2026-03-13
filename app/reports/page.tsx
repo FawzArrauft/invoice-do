@@ -138,7 +138,7 @@ export default function ReportsPage() {
             <p className="text-sm text-zinc-400">Monthly breakdown</p>
             <button
               onClick={() => setShowAmount(!showAmount)}
-              className="ml-2 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              className="ml-2 p-1.5 rounded-lg text-zinc-400 hover:text-zinc-50 hover:bg-zinc-800 transition-colors"
               title={showAmount ? "Hide amounts" : "Show amounts"}
             >
               <FontAwesomeIcon icon={showAmount ? faEye : faEyeSlash} className="w-4 h-4" />
@@ -196,7 +196,7 @@ export default function ReportsPage() {
         <div className="flex items-end gap-2">
           <button
             onClick={load}
-            className="flex-1 rounded-xl bg-white text-zinc-950 px-5 py-3 font-medium"
+            className="flex-1 rounded-xl bg-zinc-100 text-zinc-950 px-5 py-3 font-medium"
           >
             Generate
           </button>
@@ -317,7 +317,7 @@ function TabButton({
       className={[
         "rounded-xl px-4 py-2 text-sm border",
         active
-          ? "bg-white text-zinc-950 border-white"
+          ? "bg-zinc-100 text-zinc-950 border-zinc-100"
           : "bg-zinc-900/40 text-zinc-200 border-zinc-800 hover:bg-zinc-900/70",
       ].join(" ")}
     >

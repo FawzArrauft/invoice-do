@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { ToastProvider } from "@/components/Toast";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 
 const geistSans = Geist({
@@ -26,14 +27,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-theme="dark" suppressHydrationWarning>
+      <head>
+        <meta name="theme-color" content="#09090b" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}` }} />
+      </head>
       <body
-        className= "min-h-screen bg-zinc-950 text-zinc-100"
+        className="min-h-screen bg-zinc-950 text-zinc-100"
       >
-        <ToastProvider>
-          <Navbar/>
-          {children}
-        </ToastProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <Navbar/>
+            {children}
+          </ToastProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -152,7 +152,7 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
                   key={t.id}
                   type="button"
                   className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 transition-colors ${
-                    t.nopol === value ? "bg-zinc-800 text-white" : "text-zinc-300"
+                    t.nopol === value ? "bg-zinc-800 text-zinc-50" : "text-zinc-300"
                   }`}
                   onMouseDown={(e) => { e.preventDefault(); selectTruck(t.nopol); }}
                 >

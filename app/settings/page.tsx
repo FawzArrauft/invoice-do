@@ -507,7 +507,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setShowForm(!showForm)}
-              className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
             >
               <FontAwesomeIcon icon={showForm ? faXmark : faPlus} />
               {showForm ? "Batal" : "Tambah Pabrik"}
@@ -810,7 +810,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setShowMuatanTrukForm(!showMuatanTrukForm)}
-              className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
             >
               <FontAwesomeIcon icon={showMuatanTrukForm ? faXmark : faPlus} />
               {showMuatanTrukForm ? "Batal" : "Tambah Muatan"}
@@ -982,7 +982,7 @@ export default function SettingsPage() {
             </div>
             <button
               onClick={() => setShowBalenForm(!showBalenForm)}
-              className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
             >
               <FontAwesomeIcon icon={showBalenForm ? faXmark : faPlus} />
               {showBalenForm ? "Batal" : "Tambah Balen"}

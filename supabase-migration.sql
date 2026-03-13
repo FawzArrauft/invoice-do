@@ -39,3 +39,23 @@ ALTER TABLE trucks
 -- ALTER TABLE order_notes ENABLE ROW LEVEL SECURITY;
 -- CREATE POLICY "Allow all for authenticated" ON order_notes
 --   FOR ALL USING (true) WITH CHECK (true);
+
+-- 8. Buat tabel keterangan_muat
+CREATE TABLE IF NOT EXISTS keterangan_muat (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  truck_id UUID NOT NULL REFERENCES trucks(id) ON DELETE CASCADE,
+  note_id UUID REFERENCES order_notes(id) ON DELETE SET NULL,
+  "order" TEXT DEFAULT '',
+  tgl_muat TEXT DEFAULT '',
+  tgl_bongkar TEXT DEFAULT '',
+  balen TEXT DEFAULT '',
+  tgl_muat_balen TEXT DEFAULT '',
+  balen_do TEXT DEFAULT '',
+  tgl_bongkar_balen TEXT DEFAULT '',
+  tempat_bongkar TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_keterangan_muat_truck_id ON keterangan_muat(truck_id);
+CREATE INDEX IF NOT EXISTS idx_keterangan_muat_created_at ON keterangan_muat(created_at DESC);

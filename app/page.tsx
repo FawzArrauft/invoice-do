@@ -659,7 +659,7 @@ export default function CreateInvoicePage() {
             </button>
             <button
               onClick={addRow}
-              className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
             >
               + Add Row
             </button>
@@ -950,7 +950,7 @@ export default function CreateInvoicePage() {
           </button>
           <button
             onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
+            className="rounded-xl bg-zinc-100 text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
           >
             + Add Row
           </button>
@@ -1124,7 +1124,7 @@ export default function CreateInvoicePage() {
                   }}
                   className="block w-full text-sm text-zinc-300
                              file:mr-4 file:rounded-xl file:border-0
-                             file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
+                             file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
                 />
                 {uploading && (
                   <span className="text-xs text-zinc-400">Uploading…</span>
@@ -1168,7 +1168,7 @@ export default function CreateInvoicePage() {
 
         <button
           onClick={saveInvoice}
-          className="mt-6 w-full sm:w-auto rounded-xl bg-white text-zinc-950 px-8 py-3 font-medium hover:bg-zinc-200 transition-colors"
+          className="mt-6 w-full sm:w-auto rounded-xl bg-zinc-100 text-zinc-950 px-8 py-3 font-medium hover:bg-zinc-200 transition-colors"
         >
           Save Invoice
         </button>

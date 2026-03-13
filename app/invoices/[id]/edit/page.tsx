@@ -523,7 +523,7 @@ export default function EditInvoicePage() {
             </button>
             <button
               onClick={addRow}
-              className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium"
             >
               + Add Row
             </button>
@@ -798,7 +798,7 @@ export default function EditInvoicePage() {
           </button>
           <button
             onClick={addRow}
-            className="rounded-xl bg-white text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
+            className="rounded-xl bg-zinc-100 text-zinc-950 px-3 py-2 text-xs sm:text-sm font-medium hover:bg-zinc-200 transition-colors"
           >
             + Add Row
           </button>
@@ -897,7 +897,7 @@ export default function EditInvoicePage() {
                 }}
                 className="block w-full text-sm text-zinc-300
                            file:mr-4 file:rounded-xl file:border-0
-                           file:bg-white file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
+                           file:bg-zinc-100 file:px-4 file:py-2 file:text-sm file:font-medium file:text-zinc-950"
               />
               {uploading && (
                 <span className="text-xs text-zinc-400">Uploading…</span>
@@ -939,7 +939,7 @@ export default function EditInvoicePage() {
           <button
             onClick={saveInvoice}
             disabled={saving}
-            className="rounded-xl bg-white text-zinc-950 px-8 py-3 font-medium disabled:opacity-50 hover:bg-zinc-200 transition-colors"
+            className="rounded-xl bg-zinc-100 text-zinc-950 px-8 py-3 font-medium disabled:opacity-50 hover:bg-zinc-200 transition-colors"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>

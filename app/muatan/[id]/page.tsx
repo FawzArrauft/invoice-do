@@ -312,7 +312,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
         <div className="flex gap-2">
           <button
             onClick={() => { setShowCargoForm(true); resetCargoForm(); }}
-            className="rounded-xl bg-white text-zinc-950 px-4 py-2 text-sm font-medium"
+            className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium"
           >
             + Add Cargo
           </button>
@@ -550,7 +550,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
           <div className="mt-4 flex gap-2">
             <button
               onClick={handleSaveCargo}
-              className="rounded-xl bg-white text-zinc-950 px-6 py-2 font-medium"
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-6 py-2 font-medium"
             >
               {editingCargo ? "Update" : "Simpan"}
             </button>

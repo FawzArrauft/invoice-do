@@ -155,6 +155,7 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"last-updated" | "recently-added" | "old-to-new">("recently-added");
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAll, setDeletingAll] = useState(false);
@@ -229,15 +230,29 @@ export default function InvoicesPage() {
   }
 
   const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return data;
-    const query = searchQuery.toLowerCase();
-    return data.filter(
-      (inv) =>
-        inv.invoice_number.toLowerCase().includes(query) ||
-        inv.kepada_yth.toLowerCase().includes(query) ||
-        inv.tanggal.includes(query)
-    );
-  }, [data, searchQuery]);
+    let result = data;
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      result = result.filter(
+        (inv) =>
+          inv.invoice_number.toLowerCase().includes(query) ||
+          inv.kepada_yth.toLowerCase().includes(query) ||
+          inv.tanggal.includes(query)
+      );
+    }
+    return [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "last-updated":
+          return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
+        case "recently-added":
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case "old-to-new":
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        default:
+          return 0;
+      }
+    });
+  }, [data, searchQuery, sortBy]);
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6">Error: {error}</div>;
@@ -308,9 +323,9 @@ export default function InvoicesPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-4">
-        <div className="relative">
+      {/* Search & Sort */}
+      <div className="mb-4 flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
           <svg
             className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400"
             xmlns="http://www.w3.org/2000/svg"
@@ -334,6 +349,15 @@ export default function InvoicesPage() {
             className="w-full rounded-xl border border-zinc-800 bg-zinc-900/50 pl-10 pr-4 py-3 outline-none focus:border-zinc-600 placeholder:text-zinc-500 text-sm"
           />
         </div>
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+          className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-3 outline-none focus:border-zinc-600 text-sm text-zinc-300 min-w-[170px] cursor-pointer"
+        >
+          <option value="recently-added">Recently Added</option>
+          <option value="last-updated">Last Updated</option>
+          <option value="old-to-new">Old to New</option>
+        </select>
       </div>
 
       {/* Results count */}
@@ -558,7 +582,7 @@ function InvoiceShowcase({ detail }: { detail: InvoiceDetail }) {
             </tr>
             <tr>
               <td colSpan={5} className="py-1 text-right text-zinc-300 font-semibold text-xs">GRAND TOTAL</td>
-              <td colSpan={3} className="py-1 text-right text-lg font-bold text-white whitespace-nowrap">Rp {formatIDR(grandTotal)}</td>
+              <td colSpan={3} className="py-1 text-right text-lg font-bold text-zinc-50 whitespace-nowrap">Rp {formatIDR(grandTotal)}</td>
               <td></td>
             </tr>
           </tfoot>

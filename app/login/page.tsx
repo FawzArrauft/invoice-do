@@ -122,7 +122,7 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="mt-4 w-full rounded-xl bg-white text-zinc-950 font-medium py-3 disabled:opacity-60 transition-opacity"
+          className="mt-4 w-full rounded-xl bg-zinc-100 text-zinc-950 font-medium py-3 disabled:opacity-60 transition-opacity"
         >
           {loading ? "Memproses..." : "Login"}
         </button>

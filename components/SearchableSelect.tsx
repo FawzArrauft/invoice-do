@@ -262,7 +262,7 @@ export function SearchableSelect({
                         onMouseEnter={() => setHighlightIdx(idx)}
                         className={`px-4 py-2.5 text-sm cursor-pointer transition-colors flex items-center justify-between ${
                           highlightIdx === idx
-                            ? "bg-zinc-800 text-white"
+                            ? "bg-zinc-800 text-zinc-50"
                             : opt.value === value
                             ? "bg-zinc-800/50 text-zinc-100"
                             : "text-zinc-300 hover:bg-zinc-800/40"
