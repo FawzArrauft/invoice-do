@@ -133,6 +133,8 @@ function buildResponse(req: NextRequest, pathname: string) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2|ttf)$).*)",
+    // Exclude static assets (.js/.css included — otherwise /theme-script.js
+    // gets redirected to /login and the theme never applies before paint).
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:js|css|map|svg|png|jpg|jpeg|gif|webp|ico|woff2?|ttf|txt|xml|json)$).*)",
   ],
 };

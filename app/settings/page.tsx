@@ -9,10 +9,12 @@ import {
   faFloppyDisk,
   faXmark,
   faIndustry,
+  faBuilding,
   faTruck,
   faMagnifyingGlass,
 } from "@fortawesome/free-solid-svg-icons";
 import { IDRInput } from "@/components/IDRInput";
+import { toErrorMessage } from "@/lib/apiError";
 
 type Pabrik = {
   id: string;
@@ -75,8 +77,8 @@ export default function SettingsPage() {
   // Search state for pabrik
   const [pabrikSearch, setPabrikSearch] = useState("");
 
-  // Active tab: "pabrik" | "muatan-truk"
-  const [activeTab, setActiveTab] = useState<"pabrik" | "muatan-truk">("pabrik");
+  // Active tab: "pabrik" | "muatan-truk" | "perusahaan"
+  const [activeTab, setActiveTab] = useState<"pabrik" | "muatan-truk" | "perusahaan">("pabrik");
 
   // Muatan Truk state
   const [muatanTrukList, setMuatanTrukList] = useState<MuatanTruk[]>([]);
@@ -107,6 +109,17 @@ export default function SettingsPage() {
   const [editBalenFreightCost, setEditBalenFreightCost] = useState(0);
   const [savingEditBalen, setSavingEditBalen] = useState(false);
   const [balenSearch, setBalenSearch] = useState("");
+
+  // Nama Perusahaan state
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string; created_at?: string }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(true);
+  const [companyShowForm, setCompanyShowForm] = useState(false);
+  const [companyName, setCompanyName] = useState("");
+  const [savingCompany, setSavingCompany] = useState(false);
+  const [editCompanyId, setEditCompanyId] = useState<string | null>(null);
+  const [editCompanyName, setEditCompanyName] = useState("");
+  const [savingEditCompany, setSavingEditCompany] = useState(false);
+  const [companySearch, setCompanySearch] = useState("");
 
   async function fetchPabrik() {
     setLoading(true);
@@ -159,7 +172,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
 
       setPabrikList((prev) => [...prev, json.data]);
       resetForm();
@@ -207,7 +220,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
 
       setPabrikList((prev) =>
         prev.map((p) => (p.id === editId ? json.data : p)),
@@ -229,7 +242,7 @@ export default function SettingsPage() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error || "Failed");
+        throw new Error(toErrorMessage(json, "Failed"));
       }
       setPabrikList((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
@@ -273,7 +286,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       setMuatanTrukList((prev) => [...prev, json.data]);
       setMuatanTrukName("");
       setMuatanTrukCargoType("");
@@ -309,7 +322,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       setMuatanTrukList((prev) =>
         prev.map((m) => (m.id === editMuatanTrukId ? json.data : m)),
       );
@@ -330,7 +343,7 @@ export default function SettingsPage() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error || "Failed");
+        throw new Error(toErrorMessage(json, "Failed"));
       }
       setMuatanTrukList((prev) => prev.filter((m) => m.id !== id));
     } catch (err) {
@@ -387,7 +400,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       setBalenList((prev) => [...prev, json.data]);
       setBalenName("");
       setBalenCargoType("");
@@ -423,7 +436,7 @@ export default function SettingsPage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       setBalenList((prev) =>
         prev.map((b) => (b.id === editBalenId ? json.data : b)),
       );
@@ -444,7 +457,7 @@ export default function SettingsPage() {
       });
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json.error || "Failed");
+        throw new Error(toErrorMessage(json, "Failed"));
       }
       setBalenList((prev) => prev.filter((b) => b.id !== id));
     } catch (err) {
@@ -456,6 +469,109 @@ export default function SettingsPage() {
   const filteredBalenList = balenList.filter((b) =>
     b.name.toLowerCase().includes(balenSearch.toLowerCase()) ||
     b.balen_cargo_type.toLowerCase().includes(balenSearch.toLowerCase())
+  );
+
+  // === Nama Perusahaan CRUD ===
+  async function fetchCompanies() {
+    setLoadingCompanies(true);
+    try {
+      const res = await fetch("/api/companies");
+      const json = await res.json();
+      if (json.data) setCompanies(json.data);
+    } catch (err) {
+      console.error("Failed to load companies:", err);
+    } finally {
+      setLoadingCompanies(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchCompanies();
+  }, []);
+
+  function resetCompanyForm() {
+    setCompanyName("");
+    setCompanyShowForm(false);
+  }
+
+  async function handleAddCompany() {
+    if (!companyName.trim()) {
+      alert("Nama perusahaan tidak boleh kosong");
+      return;
+    }
+    setSavingCompany(true);
+    try {
+      const res = await fetch("/api/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: companyName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
+      setCompanies((prev) => [json.data, ...prev]);
+      resetCompanyForm();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Gagal menambah perusahaan");
+    } finally {
+      setSavingCompany(false);
+    }
+  }
+
+  function startEditCompany(c: { id: string; name: string }) {
+    setEditCompanyId(c.id);
+    setEditCompanyName(c.name);
+  }
+
+  function cancelEditCompany() {
+    setEditCompanyId(null);
+    setEditCompanyName("");
+  }
+
+  async function handleSaveEditCompany() {
+    if (!editCompanyId) return;
+    if (!editCompanyName.trim()) {
+      alert("Nama perusahaan tidak boleh kosong");
+      return;
+    }
+    setSavingEditCompany(true);
+    try {
+      const res = await fetch("/api/companies", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: editCompanyId, name: editCompanyName }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
+      setCompanies((prev) =>
+        prev.map((c) => (c.id === editCompanyId ? json.data : c)),
+      );
+      cancelEditCompany();
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Gagal mengupdate perusahaan");
+    } finally {
+      setSavingEditCompany(false);
+    }
+  }
+
+  async function handleDeleteCompany(id: string) {
+    if (!confirm("Yakin ingin menghapus nama perusahaan ini?")) return;
+    try {
+      const res = await fetch(`/api/companies?id=${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(toErrorMessage(json, "Failed"));
+      }
+      setCompanies((prev) => prev.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Gagal menghapus perusahaan");
+    }
+  }
+
+  const filteredCompanyList = companies.filter((c) =>
+    c.name.toLowerCase().includes(companySearch.toLowerCase())
   );
 
   return (
@@ -489,6 +605,17 @@ export default function SettingsPage() {
         >
           <FontAwesomeIcon icon={faTruck} />
           Muatan Truk
+        </button>
+        <button
+          onClick={() => setActiveTab("perusahaan")}
+          className={`px-4 py-2 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors ${
+            activeTab === "perusahaan"
+              ? "bg-amber-500/20 border border-amber-500 text-amber-400"
+              : "border border-zinc-800 text-zinc-400 hover:bg-zinc-900"
+          }`}
+        >
+          <FontAwesomeIcon icon={faBuilding} />
+          Nama Perusahaan
         </button>
       </div>
 
@@ -1127,6 +1254,145 @@ export default function SettingsPage() {
                           </button>
                           <button
                             onClick={() => handleDeleteBalen(b.id)}
+                            className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faTrash} />
+                            <span className="hidden sm:inline">Hapus</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* ====== NAMA PERUSAHAAN TAB ====== */}
+      {activeTab === "perusahaan" && (
+        <>
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div>
+              <h2 className="text-lg font-semibold">
+                <FontAwesomeIcon icon={faBuilding} className="mr-2 text-amber-400" />
+                Nama Perusahaan
+              </h2>
+              <p className="text-sm text-zinc-400">
+                Daftar nama perusahaan yang bisa dipilih saat membuat invoice
+              </p>
+            </div>
+            <button
+              onClick={() => setCompanyShowForm(!companyShowForm)}
+              className="rounded-xl bg-zinc-100 text-zinc-950 px-4 py-2 text-sm font-medium flex items-center gap-2"
+            >
+              <FontAwesomeIcon icon={companyShowForm ? faXmark : faPlus} />
+              {companyShowForm ? "Batal" : "Tambah Nama Perusahaan"}
+            </button>
+          </div>
+
+          {/* Add Company Form */}
+          {companyShowForm && (
+            <div className="mb-6 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
+              <h3 className="font-semibold mb-4">Tambah Nama Perusahaan Baru</h3>
+              <div className="max-w-md">
+                <label className="mb-2 block text-sm text-zinc-300">Nama Perusahaan *</label>
+                <input
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
+                  placeholder="Contoh: PT Sinar Jaya, CV Maju Bersama"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") handleAddCompany(); }}
+                />
+              </div>
+              <button
+                onClick={handleAddCompany}
+                disabled={savingCompany}
+                className="mt-4 rounded-xl bg-emerald-600 px-6 py-3 text-sm text-white font-medium hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                <FontAwesomeIcon icon={faFloppyDisk} />
+                {savingCompany ? "Menyimpan..." : "Simpan Perusahaan"}
+              </button>
+            </div>
+          )}
+
+          {/* Company List */}
+          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold">
+                Daftar Nama Perusahaan ({filteredCompanyList.length})
+              </h3>
+              <div className="relative">
+                <FontAwesomeIcon icon={faMagnifyingGlass} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 text-xs" />
+                <input
+                  type="text"
+                  placeholder="Cari nama perusahaan..."
+                  className="w-48 sm:w-64 rounded-xl border border-zinc-700 bg-zinc-900 pl-9 pr-4 py-2 text-sm outline-none focus:border-zinc-500 transition-colors"
+                  value={companySearch}
+                  onChange={(e) => setCompanySearch(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {loadingCompanies ? (
+              <p className="text-zinc-400 text-sm py-8 text-center">Loading...</p>
+            ) : filteredCompanyList.length === 0 ? (
+              <p className="text-zinc-400 text-sm py-8 text-center">
+                {companySearch
+                  ? "Tidak ada nama perusahaan yang cocok dengan pencarian."
+                  : 'Belum ada nama perusahaan. Klik "Tambah Nama Perusahaan" untuk menambahkan.'}
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {filteredCompanyList.map((c) => (
+                  <div key={c.id} className="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4">
+                    {editCompanyId === c.id ? (
+                      <div className="flex flex-col sm:flex-row gap-3">
+                        <input
+                          className="flex-1 rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                          value={editCompanyName}
+                          onChange={(e) => setEditCompanyName(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleSaveEditCompany(); }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleSaveEditCompany}
+                            disabled={savingEditCompany}
+                            className="rounded-xl bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faFloppyDisk} />
+                            {savingEditCompany ? "Saving..." : "Simpan"}
+                          </button>
+                          <button
+                            onClick={cancelEditCompany}
+                            className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faXmark} />
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base">{c.name}</div>
+                          <div className="text-xs text-zinc-500 mt-0.5">
+                            {c.created_at
+                              ? `Ditambahkan ${new Date(c.created_at).toLocaleDateString("id-ID")}`
+                              : ""}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEditCompany(c)}
+                            className="rounded-lg bg-blue-500/10 border border-blue-500/30 px-3 py-2 text-sm text-blue-400 hover:bg-blue-500/20 transition-colors flex items-center gap-2"
+                          >
+                            <FontAwesomeIcon icon={faPenToSquare} />
+                            <span className="hidden sm:inline">Edit</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCompany(c.id)}
                             className="rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-2 text-sm text-red-400 hover:bg-red-500/20 transition-colors flex items-center gap-2"
                           >
                             <FontAwesomeIcon icon={faTrash} />

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { formatZodError } from "@/lib/apiError";
 
 const CargoUpdateSchema = z.object({
   tanggal: z.string().optional(),
@@ -29,7 +30,7 @@ export async function PUT(
     const parsed = CargoUpdateSchema.safeParse(body);
     
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
     const sb = supabaseServer();

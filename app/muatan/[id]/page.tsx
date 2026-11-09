@@ -5,6 +5,7 @@ import { useEffect, useState, use, useCallback } from "react";
 import { formatRupiah, calculateCargoResult as calcResult } from "@/lib/calculation";
 import { RupiahInput } from "@/components/RupiahInput";
 import { SearchableSelect } from "@/components/SearchableSelect";
+import { toErrorMessage } from "@/lib/apiError";
 
 type Truck = {
   id: string;
@@ -173,7 +174,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       fetchData();
     } else {
       const data = await res.json();
-      alert(data?.error || "Gagal menyimpan cargo");
+      alert(toErrorMessage(data, "Gagal menyimpan cargo"));
     }
   }
 
@@ -204,7 +205,7 @@ export default function TruckDetailPage({ params }: { params: Promise<{ id: stri
       fetchData();
     } else {
       const data = await res.json();
-      alert(data?.error || "Gagal menghapus");
+      alert(toErrorMessage(data, "Gagal menghapus"));
     }
   }
 

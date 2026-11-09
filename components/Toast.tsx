@@ -11,7 +11,7 @@ interface ToastItem {
 }
 
 interface ToastContextType {
-  showToast: (message: string, type?: ToastType) => void;
+  showToast: (message: unknown, type?: ToastType) => void;
 }
 
 const ToastContext = createContext<ToastContextType | null>(null);
@@ -24,12 +24,65 @@ export function useToast() {
   return ctx;
 }
 
+/**
+ * Last line of defence: a toast message must always be renderable text.
+ * Accepts anything (API error objects, zod flatten output, Error instances)
+ * and flattens it to a single string so React never sees an object child.
+ */
+function normalizeMessage(input: unknown): string {
+  if (input == null) return "";
+  if (typeof input === "string") return input;
+  if (typeof input === "number" || typeof input === "boolean") return String(input);
+  if (input instanceof Error) return input.message || "";
+
+  if (Array.isArray(input)) {
+    return input.map(normalizeMessage).filter(Boolean).join(" • ");
+  }
+
+  if (typeof input === "object") {
+    const obj = input as Record<string, unknown>;
+
+    if (typeof obj.message === "string") return obj.message;
+
+    const parts: string[] = [];
+    const formErrors = obj.formErrors;
+    if (Array.isArray(formErrors)) {
+      for (const f of formErrors) {
+        const s = normalizeMessage(f);
+        if (s) parts.push(s);
+      }
+    }
+    const fieldErrors = obj.fieldErrors;
+    if (fieldErrors && typeof fieldErrors === "object") {
+      for (const [field, msgs] of Object.entries(fieldErrors as Record<string, unknown>)) {
+        const s = normalizeMessage(msgs);
+        if (s) parts.push(`${field}: ${s}`);
+      }
+    }
+    if (parts.length > 0) return parts.join(" • ");
+
+    if (typeof obj.error !== "undefined" && obj.error !== input) {
+      const s = normalizeMessage(obj.error);
+      if (s) return s;
+    }
+
+    try {
+      return JSON.stringify(input);
+    } catch {
+      return "";
+    }
+  }
+
+  return String(input);
+}
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = "info") => {
+  const showToast = useCallback((message: unknown, type: ToastType = "info") => {
+    const text = normalizeMessage(message) || "Terjadi kesalahan";
     const id = ++toastIdCounter;
-    setToasts((prev) => [...prev, { id, message, type }]);
+    setToasts((prev) => [...prev, { id, message: text, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import { ToastProvider } from "@/components/Toast";
@@ -32,11 +33,17 @@ export default function RootLayout({
         <meta name="theme-color" content="#09090b" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t)}catch(e){}` }} />
       </head>
       <body
         className="min-h-screen bg-zinc-950 text-zinc-100"
       >
+        {/*
+          next/script + beforeInteractive runs before hydration and before first
+          paint, so the stored theme applies without a flash. A raw <script> tag
+          rendered inside a component triggers React 19's
+          "Encountered a script tag while rendering React component" warning.
+        */}
+        <Script src="/theme-script.js" strategy="beforeInteractive" />
         <ThemeProvider>
           <ToastProvider>
             <Navbar/>

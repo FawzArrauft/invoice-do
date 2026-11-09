@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { formatZodError } from "@/lib/apiError";
 
 const MuatanSchema = z.object({
   truck_id: z.string().uuid(),
@@ -41,7 +42,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const parsed = MuatanSchema.safeParse(await req.json());
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }
 
   const sb = supabaseServer();

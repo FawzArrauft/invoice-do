@@ -2,12 +2,14 @@
 
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useToast } from "@/components/Toast";
 import { NopolInput } from "@/components/NopolInput";
 import { IDRInput } from "@/components/IDRInput";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCirclePlus } from "@fortawesome/free-solid-svg-icons";
+import { toErrorMessage } from "@/lib/apiError";
 
 
 type ItemType = "default" | "murti" | "japfa";
@@ -34,6 +36,32 @@ type Item = {
 
 function formatIDR(n: number) {
   return new Intl.NumberFormat("id-ID").format(n);
+}
+
+/**
+ * Blank draft row. `tanggal_item` stays empty here on purpose: this runs
+ * during render (including the SSR/prerender pass), so it must not depend on
+ * the current date. The mount effect fills it with today's date.
+ */
+function makeEmptyItem(): Item {
+  return {
+    type: "default",
+    nopol: "",
+    tujuan: "",
+    jenis: "",
+    ongkir: 0,
+    berat: 0,
+    kuli: 0,
+    uang_makan: 0,
+    keterangan: "",
+    tanggal_item: "",
+    extra_charges: [],
+    is_empty_row: false,
+  };
+}
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
 }
 
 type Pabrik = {
@@ -64,17 +92,16 @@ export default function CreateInvoicePage() {
     return null;
   }
 
-  const cached = useRef(typeof window !== "undefined" ? loadCache() : null);
+  // IMPORTANT: never read sessionStorage or call Date during render.
+  // This page is prerendered server-side, so a client-only value in a
+  // useState initializer makes the first client render differ from the
+  // shipped HTML and React raises a hydration mismatch (#418).
+  // The draft is applied in the mount effect below instead.
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [tanggal, setTanggal] = useState("");
+  const [kepadaYth, setKepadaYth] = useState("");
 
-  const [invoiceNumber, setInvoiceNumber] = useState(cached.current?.invoiceNumber ?? "");
-  const [tanggal, setTanggal] = useState(cached.current?.tanggal ?? new Date().toISOString().slice(0, 10));
-  const [kepadaYth, setKepadaYth] = useState(cached.current?.kepadaYth ?? "");
-
-  const [items, setItems] = useState<Item[]>(
-    cached.current?.items ?? [
-      { type: "default", nopol: "", tujuan: "", jenis: "", ongkir: 0, berat: 0, kuli: 0, uang_makan: 0, keterangan: "", tanggal_item: new Date().toISOString().slice(0, 10), extra_charges: [], is_empty_row: false },
-    ]
-  );
+  const [items, setItems] = useState<Item[]>(() => [makeEmptyItem()]);
 
   // Ref for bottom "Add Row" button area
   const bottomAddRowRef = useRef<HTMLDivElement | null>(null);
@@ -82,14 +109,12 @@ export default function CreateInvoicePage() {
   // Refs for auto-scroll
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
-  const [footerTanggal, setFooterTanggal] = useState(
-    cached.current?.footerTanggal ?? new Date().toISOString().slice(0, 10),
-  );
-  const [bankName, setBankName] = useState(cached.current?.bankName ?? "");
-  const [noRekening, setNoRekening] = useState(cached.current?.noRekening ?? "");
-  const [namaRekening, setNamaRekening] = useState(cached.current?.namaRekening ?? "");
-  const [signatureName, setSignatureName] = useState(cached.current?.signatureName ?? "");
-  const [signatureUrl, setSignatureUrl] = useState(cached.current?.signatureUrl ?? "");
+  const [footerTanggal, setFooterTanggal] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [noRekening, setNoRekening] = useState("");
+  const [namaRekening, setNamaRekening] = useState("");
+  const [signatureName, setSignatureName] = useState("");
+  const [signatureUrl, setSignatureUrl] = useState("");
   const [uploading, setUploading] = useState(false);
   const [useDefaultSignature, setUseDefaultSignature] = useState(true);
   const [defaultSignatureUrl, setDefaultSignatureUrl] = useState("");
@@ -99,7 +124,7 @@ export default function CreateInvoicePage() {
   // Bank dropdown state
   const [bankList, setBankList] = useState<Array<{ id: string; name: string; noRekening: string; accountName: string }>>([]);
   const [loadingBanks, setLoadingBanks] = useState(false);
-  const [selectedBankId, setSelectedBankId] = useState(cached.current?.selectedBankId ?? "");
+  const [selectedBankId, setSelectedBankId] = useState("");
   const [showAddBank, setShowAddBank] = useState(false);
   const [newBankName, setNewBankName] = useState("");
   const [newNoRekening, setNewNoRekening] = useState("");
@@ -110,12 +135,18 @@ export default function CreateInvoicePage() {
   const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
   const [loadingPabrik, setLoadingPabrik] = useState(false);
 
+  // Nama Perusahaan (Settings-managed)
+  const [companyList, setCompanyList] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
+  const [namaPerusahaan, setNamaPerusahaan] = useState("");
+  const [showCompanyEmpty, setShowCompanyEmpty] = useState(false);
+
   // Truck list for NoPol dropdown
   const [truckList, setTruckList] = useState<Array<{ id: string; nopol: string; keterangan?: string; nama_supir?: string }>>([]);
 
   // Order Notes state (informational - who ordered)
   const [notesList, setNotesList] = useState<Array<{ id: string; name: string; phone: string; description: string }>>([]);
-  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>(cached.current?.selectedNotes ?? []);
+  const [selectedNotes, setSelectedNotes] = useState<Array<{ id: string; name: string; phone: string }>>([]);
 
   // Validation state
   const [validationErrors, setValidationErrors] = useState<{ kepadaYth?: string; tanggal?: string; signatureName?: string; items: Record<number, { nopol?: string; tujuan?: string }> }>({ items: {} });
@@ -125,18 +156,72 @@ export default function CreateInvoicePage() {
   const saveCache = useCallback(() => {
     try {
       const data = {
-        invoiceNumber, tanggal, kepadaYth, items, footerTanggal,
+        invoiceNumber,        tanggal, kepadaYth, items, footerTanggal,
         bankName, noRekening, namaRekening, signatureName, signatureUrl,
-        selectedBankId, selectedNotes,
+        selectedBankId, selectedNotes, namaPerusahaan,
       };
       sessionStorage.setItem(CACHE_KEY, JSON.stringify(data));
     } catch { /* quota exceeded or private mode */ }
-  }, [invoiceNumber, tanggal, kepadaYth, items, footerTanggal, bankName, noRekening, namaRekening, signatureName, signatureUrl, selectedBankId, selectedNotes]);
+  }, [invoiceNumber, tanggal, kepadaYth, items, footerTanggal, bankName, noRekening, namaRekening, signatureName, signatureUrl, selectedBankId, selectedNotes, namaPerusahaan]);
 
   useEffect(() => {
     if (!isMountedRef.current) { isMountedRef.current = true; return; }
     saveCache();
   }, [saveCache]);
+
+  // Apply the saved draft (and today's date) AFTER hydration.
+  // Doing this in a state initializer would make the first client render
+  // differ from the server HTML and trigger React error #418.
+  const hydratedDraftRef = useRef(false);
+  useEffect(() => {
+    if (hydratedDraftRef.current) return;
+    hydratedDraftRef.current = true;
+
+    const draft = loadCache() as Record<string, unknown> | null;
+    const today = todayISO();
+
+    if (draft) {
+      const str = (v: unknown) => (typeof v === "string" ? v : "");
+      const arr = <T,>(v: unknown): T[] | null => (Array.isArray(v) ? (v as T[]) : null);
+
+      setInvoiceNumber(str(draft.invoiceNumber));
+      setTanggal(str(draft.tanggal) || today);
+      setKepadaYth(str(draft.kepadaYth));
+      setFooterTanggal(str(draft.footerTanggal) || today);
+      setBankName(str(draft.bankName));
+      setNoRekening(str(draft.noRekening));
+      setNamaRekening(str(draft.namaRekening));
+      setSignatureName(str(draft.signatureName));
+      setSignatureUrl(str(draft.signatureUrl));
+      setSelectedBankId(str(draft.selectedBankId));
+      setNamaPerusahaan(str(draft.namaPerusahaan));
+
+      const draftItems = arr<Item>(draft.items);
+      if (draftItems && draftItems.length > 0) {
+        setItems(
+          draftItems.map((it) => ({
+            ...makeEmptyItem(),
+            ...it,
+            extra_charges: Array.isArray(it.extra_charges) ? it.extra_charges : [],
+            tanggal_item: it.tanggal_item || today,
+          })),
+        );
+      } else {
+        setItems([{ ...makeEmptyItem(), tanggal_item: today }]);
+      }
+
+      const draftNotes = arr<{ id: string; name: string; phone: string }>(draft.selectedNotes);
+      if (draftNotes) setSelectedNotes(draftNotes);
+
+      // Mark mounted so the persist effect may start writing.
+      isMountedRef.current = true;
+    } else {
+      setTanggal(today);
+      setFooterTanggal(today);
+      setItems([{ ...makeEmptyItem(), tanggal_item: today }]);
+      isMountedRef.current = true;
+    }
+  }, []);
 
   function clearCache() {
     try { sessionStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
@@ -146,22 +231,30 @@ export default function CreateInvoicePage() {
   useEffect(() => {
     async function loadData() {
       setLoadingPabrik(true);
+      setLoadingCompanies(true);
       try {
-        const [pabrikRes, notesRes, trucksRes] = await Promise.all([
+        const [pabrikRes, notesRes, trucksRes, companiesRes] = await Promise.all([
           fetch("/api/settings/pabrik"),
           fetch("/api/notes"),
           fetch("/api/trucks"),
+          fetch("/api/companies"),
         ]);
         const pabrikJson = await pabrikRes.json();
         const notesJson = await notesRes.json();
         const trucksJson = await trucksRes.json();
+        const companiesJson = await companiesRes.json();
         if (pabrikJson.data) setPabrikList(pabrikJson.data);
         if (notesJson.data) setNotesList(notesJson.data);
         if (trucksJson.data) setTruckList(trucksJson.data.map((t: { id: string; nopol: string; keterangan?: string; nama_supir?: string }) => ({ id: t.id, nopol: t.nopol, keterangan: t.keterangan || "", nama_supir: t.nama_supir || "" })));
+        if (companiesJson.data) {
+          setCompanyList(companiesJson.data);
+          if (companiesJson.data.length === 0) setShowCompanyEmpty(true);
+        }
       } catch (err) {
         console.error("Failed to load data:", err);
       } finally {
         setLoadingPabrik(false);
+        setLoadingCompanies(false);
       }
     }
     loadData();
@@ -266,7 +359,7 @@ export default function CreateInvoicePage() {
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       
       // Add to list and select it
       const newBank = json.data;
@@ -417,7 +510,7 @@ export default function CreateInvoicePage() {
         body: fd,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Upload failed");
+      if (!res.ok) throw new Error(toErrorMessage(data, "Upload failed"));
       setSignatureUrl(data.url);
       setUseDefaultSignature(false);
     } finally {
@@ -459,7 +552,13 @@ export default function CreateInvoicePage() {
   async function saveInvoice() {
     // Run validation first — skip completely empty (draft) rows
     const errors: { kepadaYth?: string; tanggal?: string; signatureName?: string; items: Record<number, { nopol?: string; tujuan?: string }> } = { items: {} };
-    if (!kepadaYth.trim()) errors.kepadaYth = "Kepada Yth wajib diisi";
+    
+    // Kepada Yth boleh kosong selama Nama Perusahaan (dari Settings) dipilih —
+    // nama perusahaan otomatis dipakai sebagai penerima invoice.
+    const companySelected = companyList.some(c => c.name === namaPerusahaan.trim());
+    const recipient = kepadaYth.trim() || (companySelected ? namaPerusahaan.trim() : "");
+
+    if (!recipient) errors.kepadaYth = "Kepada Yth atau Nama Perusahaan wajib diisi";
     if (!tanggal.trim()) errors.tanggal = "Tanggal wajib diisi";
     if (!signatureName.trim()) errors.signatureName = "Nama tanda tangan wajib diisi";
 
@@ -504,7 +603,8 @@ export default function CreateInvoicePage() {
     const payload = {
       invoiceNumber,
       tanggal,
-      kepadaYth,
+      kepadaYth: recipient,
+      namaPerusahaan,
       items: nonEmptyItems.map((it) => ({
         type: it.type || "default",
         nopol: it.nopol || "",
@@ -536,7 +636,7 @@ export default function CreateInvoicePage() {
 
     const data = await res.json();
     if (!res.ok) {
-      showToast(data?.error || "Gagal menyimpan invoice", "error");
+      showToast(toErrorMessage(data, "Gagal menyimpan invoice"), "error");
       return;
     }
     showToast("Invoice berhasil disimpan!", "success");
@@ -590,7 +690,6 @@ export default function CreateInvoicePage() {
           <Field label="Kepada Yth *" error={showValidation ? validationErrors.kepadaYth : undefined}>
             <input
               id="kepada-yth-input"
-              required
               className={`w-full rounded-xl border ${showValidation && validationErrors.kepadaYth ? 'border-red-500 bg-red-950/20' : 'border-zinc-800 bg-zinc-950'} px-4 py-3 outline-none focus:border-zinc-600`}
               placeholder="Nama Perusahaan"
               value={kepadaYth}
@@ -604,7 +703,51 @@ export default function CreateInvoicePage() {
           </Field>
         </div>
 
-        {/* Order Notes - Informational only (siapa yang order) */}
+        {/* Nama Perusahaan (from Settings) */}
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <label className="mb-2 block text-sm text-zinc-300 font-medium">
+            Nama Perusahaan
+          </label>
+          {loadingCompanies ? (
+            <div className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-500">
+              Loading...
+            </div>
+          ) : companyList.length === 0 ? (
+            <div className="w-full sm:max-w-md rounded-xl border border-amber-500/30 bg-amber-950/10 px-4 py-3 text-sm text-amber-400">
+              Belum ada nama perusahaan. Tambahkan di{" "}
+              <Link href="/settings" className="underline font-medium">
+                Settings → Nama Perusahaan
+              </Link>
+              .
+            </div>
+          ) : (
+            <select
+              value={namaPerusahaan}
+              onChange={(e) => {
+                const value = e.target.value;
+                setNamaPerusahaan(value);
+                // Auto-isi Kepada Yth dari perusahaan terpilih bila masih kosong
+                if (value && !kepadaYth.trim()) {
+                  setKepadaYth(value);
+                  setValidationErrors((prev) => ({ ...prev, kepadaYth: undefined }));
+                }
+              }}
+              className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 text-sm"
+            >
+              <option value="">-- Pilih Nama Perusahaan --</option>
+              {companyList.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-xs text-zinc-500 mt-1">
+            Dipilih dari daftar yang dikelola di Settings.
+          </p>
+        </div>
+
+      {/* Order Notes - Informational only (siapa yang order) */}
         <div className="mt-4 border-t border-zinc-800 pt-4">
           <label className="mb-2 block text-sm text-zinc-300 font-medium">Order Notes (Info saja, tidak di-export)</label>
           <div className="w-full sm:w-auto sm:min-w-[300px]">
@@ -738,22 +881,39 @@ export default function CreateInvoicePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                 <div>
                   <Label>Tipe</Label>
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    value={it.type}
-                    onChange={(e) => {
-                      const newType = e.target.value as ItemType;
-                      const patch: Partial<Item> = { type: newType };
-                      if (newType === "japfa") {
-                        patch.tujuan = "JAPFA SIDOARJO";
-                      }
-                      updateItem(i, patch);
-                    }}
-                  >
-                    <option value="default">Default</option>
-                    <option value="murti">Murti</option>
-                    <option value="japfa">Japfa</option>
-                  </select>
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipe">
+                    {([
+                      { value: "default", label: "Default" },
+                      { value: "murti", label: "Murti" },
+                      { value: "japfa", label: "Japfa" },
+                    ] as const).map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex-1 min-w-[72px] cursor-pointer rounded-xl border px-3 py-2.5 text-sm text-center transition-colors select-none ${
+                          it.type === opt.value
+                            ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                            : "border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`tipe-${i}`}
+                          value={opt.value}
+                          checked={it.type === opt.value}
+                          onChange={() => {
+                            const newType = opt.value as ItemType;
+                            const patch: Partial<Item> = { type: newType };
+                            if (newType === "japfa") {
+                              patch.tujuan = "JAPFA SIDOARJO";
+                            }
+                            updateItem(i, patch);
+                          }}
+                          className="sr-only"
+                        />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -842,7 +1002,7 @@ export default function CreateInvoicePage() {
 
               {/* Row 3: Kuli/UangMakan, Keterangan */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {it.type !== "japfa" && (
+                {it.type === "murti" && (
                   <div>
                     <Label>Kuli (IDR)</Label>
                     <IDRInput

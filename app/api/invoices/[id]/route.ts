@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { formatZodError } from "@/lib/apiError";
 
 const ExtraChargeSchema = z.object({
   amount: z.number().nonnegative(),
@@ -26,7 +27,8 @@ const ItemSchema = z.object({
 const UpdateBodySchema = z.object({
   invoiceNumber: z.string().optional().default(""),
   tanggal: z.string(),
-  kepadaYth: z.string().min(1),
+  kepadaYth: z.string().optional().default(""),
+  namaPerusahaan: z.string().optional().default(""),
   items: z.array(ItemSchema).min(1),
   footerTanggal: z.string(),
   bankName: z.string().optional().default(""),
@@ -92,13 +94,21 @@ export async function PUT(
     
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.flatten() },
+        { error: formatZodError(parsed.error, "Data invoice tidak valid") },
         { status: 400 }
       );
     }
 
     const sb = supabaseServer();
     const data = parsed.data;
+
+    const recipient = (data.kepadaYth || "").trim() || (data.namaPerusahaan || "").trim();
+    if (!recipient) {
+      return NextResponse.json(
+        { error: "Kepada Yth atau Nama Perusahaan wajib diisi" },
+        { status: 400 },
+      );
+    }
 
     const totalOngkir = data.items.reduce((sum, it) => sum + it.ongkir, 0);
     const totalKuli = data.items.reduce((sum, it) => sum + (it.kuli || 0), 0);
@@ -112,7 +122,8 @@ export async function PUT(
       .update({
         invoice_number: data.invoiceNumber,
         tanggal: data.tanggal,
-        kepada_yth: data.kepadaYth,
+        kepada_yth: recipient,
+        nama_perusahaan: data.namaPerusahaan ? data.namaPerusahaan : null,
         total_ongkir: grandTotal,
         footer_tanggal: data.footerTanggal,
         bank_name: data.bankName,

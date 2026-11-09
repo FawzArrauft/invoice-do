@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { toErrorMessage } from "@/lib/apiError";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -55,7 +56,7 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(data.error || "Login gagal");
+        throw new Error(toErrorMessage(data, "Login gagal"));
       }
 
       // Immediate redirect to dashboard — window.location ensures cookies are sent

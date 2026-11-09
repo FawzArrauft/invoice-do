@@ -92,7 +92,7 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
       .filter(Boolean)
       .join(" ");
     onChange(combined);
-    if (trucks.length > 0) setShowDropdown(true);
+    // Do NOT auto-open the dropdown while typing — typing must remain under user control.
   }
 
   function selectTruck(nopol: string) {
@@ -110,7 +110,7 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
           maxLength={2}
           autoCapitalize="characters"
           value={parsed.prefix}
-          onFocus={() => trucks.length > 0 && setShowDropdown(true)}
+          onFocus={() => { /* list opens only via explicit toggle */ }}
           onChange={(e) => handleChange("prefix", e.target.value.replace(/[^A-Za-z]/g, ""))}
         />
         <input
@@ -119,7 +119,7 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
           maxLength={4}
           inputMode="numeric"
           value={parsed.number}
-          onFocus={() => trucks.length > 0 && setShowDropdown(true)}
+          onFocus={() => { /* list opens only via explicit toggle */ }}
           onChange={(e) => handleChange("number", e.target.value.replace(/[^0-9]/g, ""))}
         />
         <input
@@ -128,10 +128,23 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
           maxLength={3}
           autoCapitalize="characters"
           value={parsed.suffix}
-          onFocus={() => trucks.length > 0 && setShowDropdown(true)}
+          onFocus={() => { /* list opens only via explicit toggle */ }}
           onChange={(e) => handleChange("suffix", e.target.value.replace(/[^A-Za-z]/g, ""))}
         />
       </div>
+      {trucks.length > 0 && (
+        <button
+          type="button"
+          onClick={() => {
+            setShowDropdown((s) => !s);
+            if (!showDropdown) setSearch(value);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-zinc-500 hover:text-zinc-300 transition-colors px-1"
+          aria-label={showDropdown ? "Tutup daftar nopol" : "Buka daftar nopol"}
+        >
+          {showDropdown ? "✕" : "▾"}
+        </button>
+      )}
       {showDropdown && trucks.length > 0 && (
         <div className="absolute z-50 mt-1 w-full rounded-xl border border-zinc-700 bg-zinc-900 shadow-lg">
           <div className="p-2 border-b border-zinc-800">
@@ -140,7 +153,6 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
               placeholder="Cari nopol, keterangan, supir..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              autoFocus
             />
           </div>
           <div className="max-h-48 overflow-y-auto">
@@ -154,7 +166,7 @@ export function NopolInput({ value, onChange, trucks = [] }: NopolInputProps) {
                   className={`w-full text-left px-3 py-2 text-sm hover:bg-zinc-800 transition-colors ${
                     t.nopol === value ? "bg-zinc-800 text-zinc-50" : "text-zinc-300"
                   }`}
-                  onMouseDown={(e) => { e.preventDefault(); selectTruck(t.nopol); }}
+                  onClick={() => selectTruck(t.nopol)}
                 >
                   <span className="font-mono">{t.nopol}</span>
                   {(t.keterangan || t.nama_supir) && (

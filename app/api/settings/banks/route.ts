@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { formatZodError } from "@/lib/apiError";
 import { encryptData, decryptData, maskAccountNumber } from "@/lib/encryption";
 
 const BankSchema = z.object({
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.flatten() },
+        { error: formatZodError(parsed.error) },
         { status: 400 }
       );
     }

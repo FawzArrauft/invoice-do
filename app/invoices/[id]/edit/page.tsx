@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useToast } from "@/components/Toast";
 import { NopolInput } from "@/components/NopolInput";
@@ -8,6 +8,7 @@ import { IDRInput } from "@/components/IDRInput";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faCirclePlus } from "@fortawesome/free-solid-svg-icons";
+import { toErrorMessage } from "@/lib/apiError";
 
 type ItemType = "default" | "murti" | "japfa";
 
@@ -83,6 +84,7 @@ export default function EditInvoicePage() {
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [tanggal, setTanggal] = useState("");
   const [kepadaYth, setKepadaYth] = useState("");
+  const [namaPerusahaan, setNamaPerusahaan] = useState("");
   const [items, setItems] = useState<Item[]>([]);
   const [footerTanggal, setFooterTanggal] = useState("");
   const [bankName, setBankName] = useState("");
@@ -99,6 +101,10 @@ export default function EditInvoicePage() {
   // Pabrik dropdown state
   const [pabrikList, setPabrikList] = useState<Pabrik[]>([]);
   const [loadingPabrik, setLoadingPabrik] = useState(false);
+
+  // Nama Perusahaan (Settings-managed)
+  const [companyList, setCompanyList] = useState<Array<{ id: string; name: string }>>([]);
+  const [loadingCompanies, setLoadingCompanies] = useState(false);
 
   // Truck list for NoPol dropdown
   const [truckList, setTruckList] = useState<Array<{ id: string; nopol: string; keterangan?: string; nama_supir?: string }>>([]);
@@ -121,12 +127,13 @@ export default function EditInvoicePage() {
       try {
         const res = await fetch(`/api/invoices/${invoiceId}`);
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed to load invoice");
+        if (!res.ok) throw new Error(toErrorMessage(json, "Failed to load invoice"));
 
         const inv: InvoiceData = json.data;
         setInvoiceNumber(inv.invoice_number || "");
         setTanggal(inv.tanggal || "");
         setKepadaYth(inv.kepada_yth || "");
+        setNamaPerusahaan((inv as { nama_perusahaan?: string }).nama_perusahaan || "");
         setFooterTanggal(inv.footer_tanggal || "");
         setBankName(inv.bank_name || "");
         setNoRekening(inv.no_rekening || "");
@@ -170,22 +177,27 @@ export default function EditInvoicePage() {
   useEffect(() => {
     async function loadData() {
       setLoadingPabrik(true);
+      setLoadingCompanies(true);
       try {
-        const [pabrikRes, trucksRes, notesRes] = await Promise.all([
+        const [pabrikRes, trucksRes, notesRes, companiesRes] = await Promise.all([
           fetch("/api/settings/pabrik"),
           fetch("/api/trucks"),
           fetch("/api/notes"),
+          fetch("/api/companies"),
         ]);
         const pabrikJson = await pabrikRes.json();
         const trucksJson = await trucksRes.json();
         const notesJson = await notesRes.json();
+        const companiesJson = await companiesRes.json();
         if (pabrikJson.data) setPabrikList(pabrikJson.data);
         if (trucksJson.data) setTruckList(trucksJson.data.map((t: { id: string; nopol: string; keterangan?: string; nama_supir?: string }) => ({ id: t.id, nopol: t.nopol, keterangan: t.keterangan || "", nama_supir: t.nama_supir || "" })));
         if (notesJson.data) setNotesList(notesJson.data);
+        if (companiesJson.data) setCompanyList(companiesJson.data);
       } catch (err) {
         console.error("Failed to load data:", err);
       } finally {
         setLoadingPabrik(false);
+        setLoadingCompanies(false);
       }
     }
     loadData();
@@ -210,7 +222,10 @@ export default function EditInvoicePage() {
   // Validate form and return errors
   function validateForm(): ValidationErrors {
     const errors: ValidationErrors = { items: {} };
-    if (!kepadaYth.trim()) errors.kepadaYth = "Kepada Yth wajib diisi";
+    // Kepada Yth boleh kosong selama Nama Perusahaan (dari Settings) dipilih
+    const companySelected = companyList.some((c) => c.name === namaPerusahaan.trim());
+    const recipient = kepadaYth.trim() || (companySelected ? namaPerusahaan.trim() : "");
+    if (!recipient) errors.kepadaYth = "Kepada Yth atau Nama Perusahaan wajib diisi";
     if (!tanggal.trim()) errors.tanggal = "Tanggal wajib diisi";
     if (!signatureName.trim()) errors.signatureName = "Nama tanda tangan wajib diisi";
 
@@ -325,7 +340,7 @@ export default function EditInvoicePage() {
         body: fd,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Upload failed");
+      if (!res.ok) throw new Error(toErrorMessage(data, "Upload failed"));
       setSignatureUrl(data.url);
     } finally {
       setUploading(false);
@@ -364,7 +379,8 @@ export default function EditInvoicePage() {
     const payload = {
       invoiceNumber,
       tanggal,
-      kepadaYth,
+      kepadaYth: kepadaYth.trim() || namaPerusahaan.trim(),
+      namaPerusahaan,
       items: items.map((it) => ({
         id: it.id,
         type: it.type || "default",
@@ -399,7 +415,7 @@ export default function EditInvoicePage() {
 
       const data = await res.json();
       if (!res.ok) {
-        showToast(data?.error || "Failed", "error");
+        showToast(toErrorMessage(data, "Failed"), "error");
         return;
       }
       showToast("Invoice updated successfully", "success");
@@ -468,6 +484,46 @@ export default function EditInvoicePage() {
               }}
             />
           </Field>
+        </div>
+
+        {/* Nama Perusahaan (from Settings) */}
+        <div className="mt-4 border-t border-zinc-800 pt-4">
+          <label className="mb-2 block text-sm text-zinc-300 font-medium">
+            Nama Perusahaan
+          </label>
+          {loadingCompanies ? (
+            <div className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm text-zinc-500">
+              Loading...
+            </div>
+          ) : companyList.length === 0 ? (
+            <div className="w-full sm:max-w-md rounded-xl border border-amber-500/30 bg-amber-950/10 px-4 py-3 text-sm text-amber-400">
+              Belum ada nama perusahaan. Tambahkan lewat menu Settings.
+            </div>
+          ) : (
+            <select
+              value={namaPerusahaan}
+              onChange={(e) => {
+                const value = e.target.value;
+                setNamaPerusahaan(value);
+                // Auto-isi Kepada Yth dari perusahaan terpilih bila masih kosong
+                if (value && !kepadaYth.trim()) {
+                  setKepadaYth(value);
+                  setValidationErrors((prev) => ({ ...prev, kepadaYth: undefined }));
+                }
+              }}
+              className="w-full sm:max-w-md rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600 text-sm"
+            >
+              <option value="">-- Pilih Nama Perusahaan --</option>
+              {companyList.map((c) => (
+                <option key={c.id} value={c.name}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
+          <p className="text-xs text-zinc-500 mt-1">
+            Dipilih dari daftar yang dikelola di Settings.
+          </p>
         </div>
 
         {/* Order Notes */}
@@ -586,22 +642,39 @@ export default function EditInvoicePage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
                 <div>
                   <Label>Tipe</Label>
-                  <select
-                    className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3 outline-none focus:border-zinc-600"
-                    value={it.type}
-                    onChange={(e) => {
-                      const newType = e.target.value as ItemType;
-                      const patch: Partial<Item> = { type: newType };
-                      if (newType === "japfa") {
-                        patch.tujuan = "JAPFA SIDOARJO";
-                      }
-                      updateItem(i, patch);
-                    }}
-                  >
-                    <option value="default">Default</option>
-                    <option value="murti">Murti</option>
-                    <option value="japfa">Japfa</option>
-                  </select>
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Tipe">
+                    {([
+                      { value: "default", label: "Default" },
+                      { value: "murti", label: "Murti" },
+                      { value: "japfa", label: "Japfa" },
+                    ] as const).map((opt) => (
+                      <label
+                        key={opt.value}
+                        className={`flex-1 min-w-[72px] cursor-pointer rounded-xl border px-3 py-2.5 text-sm text-center transition-colors select-none ${
+                          it.type === opt.value
+                            ? "border-amber-500 bg-amber-500/15 text-amber-300"
+                            : "border-zinc-800 bg-zinc-950 text-zinc-400 hover:border-zinc-600"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`tipe-${i}`}
+                          value={opt.value}
+                          checked={it.type === opt.value}
+                          onChange={() => {
+                            const newType = opt.value as ItemType;
+                            const patch: Partial<Item> = { type: newType };
+                            if (newType === "japfa") {
+                              patch.tujuan = "JAPFA SIDOARJO";
+                            }
+                            updateItem(i, patch);
+                          }}
+                          className="sr-only"
+                        />
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <div>
@@ -690,7 +763,7 @@ export default function EditInvoicePage() {
 
               {/* Row 3: Kuli/UangMakan, Keterangan */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                {it.type !== "japfa" && (
+                {it.type === "murti" && (
                   <div>
                     <Label>Kuli (IDR)</Label>
                     <IDRInput

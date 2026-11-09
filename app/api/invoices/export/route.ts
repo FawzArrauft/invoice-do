@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { z } from "zod";
+import { formatZodError } from "@/lib/apiError";
 
 const BodySchema = z.object({
   header: z.object({
@@ -26,7 +27,7 @@ export async function POST(req: Request) {
   const json = await req.json();
   const parsed = BodySchema.safeParse(json);
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
   }
 
   const { header, items, footer } = parsed.data;

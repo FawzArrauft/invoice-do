@@ -437,9 +437,6 @@ export async function GET(
                 <Text style={[styles.tableHeaderText, styles.colOngkir]}>
                   Ongkir (RP)
                 </Text>
-                <Text style={[styles.tableHeaderText, styles.colKuli]}>
-                  Kuli (RP)
-                </Text>
                 <Text style={[styles.tableHeaderText, styles.colBerat]}>
                   Berat
                 </Text>
@@ -534,9 +531,6 @@ export async function GET(
                   <Text style={styles.colTujuan}>{it.tujuan}</Text>
                   <Text style={styles.colJenis}>{it.jenis}</Text>
                   <Text style={styles.colOngkir}>{idr(it.ongkir)}</Text>
-                  <Text style={styles.colKuli}>
-                    {it.kuli ? idr(it.kuli) : "-"}
-                  </Text>
                   <Text style={styles.colBerat}>{it.berat}</Text>
                   <Text style={styles.colKeterangan}>
                     {getKeteranganDisplay(it)}

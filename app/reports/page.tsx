@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faFileExcel, faEye, faEyeSlash, faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { toErrorMessage } from "@/lib/apiError";
 
 function idr(n: number) {
   return "Rp " + new Intl.NumberFormat("id-ID").format(n || 0);
@@ -58,7 +59,7 @@ export default function ReportsPage() {
         `/api/reports/monthly?start=${startDate}&end=${endDate}`,
       );
       const json = await res.json();
-      if (!res.ok) throw new Error(json?.error || "Failed");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Failed"));
       setData(json);
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : "Failed to load report";
@@ -96,7 +97,7 @@ export default function ReportsPage() {
 
       if (!res.ok) {
         const json = await res.json();
-        throw new Error(json?.error || "Export failed");
+        throw new Error(toErrorMessage(json, "Export failed"));
       }
 
       // Download file

@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useMemo, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/components/Toast";
+import { toErrorMessage } from "@/lib/apiError";
 
 type Invoice = {
   id: string;
@@ -51,10 +52,64 @@ function formatDateDMY(dateStr: string | null | undefined): string {
 }
 
 function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; invoiceNumber: string }) {
+  const [state, setState] = useState<"idle" | "loading" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  async function handleDownload() {
+    if (state === "loading") return; // block duplicate clicks
+    setState("loading");
+    setErrorMsg(null);
+    try {
+      const res = await fetch(`/api/invoices/${invoiceId}/pdf`);
+      if (!res.ok) throw new Error(`Gagal (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `invoice-${invoiceNumber}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      setState("idle");
+    } catch (err: unknown) {
+      console.error("PDF download failed:", err);
+      setErrorMsg(err instanceof Error ? err.message : "Gagal mengunduh PDF");
+      setState("error");
+    }
+  }
+
+  if (state === "loading") {
+    return (
+      <button
+        disabled
+        className="flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-400 whitespace-nowrap cursor-not-allowed"
+        aria-busy="true"
+      >
+        <span className="inline-block h-3 w-3 animate-pulse rounded-full border-2 border-amber-400/40 border-t-amber-400" />
+        <span className="hidden sm:inline">Menyiapkan PDF…</span>
+      </button>
+    );
+  }
+
+  if (state === "error") {
+    return (
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => { setState("idle"); handleDownload(); }}
+          className="flex items-center justify-center gap-1.5 rounded-lg bg-red-500/10 border border-red-500/30 px-3 py-1.5 text-xs font-medium text-red-400 hover:bg-red-500/20 transition-colors whitespace-nowrap"
+          title={errorMsg || "Gagal"}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span className="hidden sm:inline">Coba Lagi</span>
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <a
-      href={`/api/invoices/${invoiceId}/pdf`}
-      download={`invoice-${invoiceNumber}.pdf`}
+    <button
+      onClick={handleDownload}
       className="flex items-center justify-center gap-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors whitespace-nowrap"
     >
       <svg
@@ -73,7 +128,7 @@ function DownloadPdfButton({ invoiceId, invoiceNumber }: { invoiceId: string; in
         <line x1="12" y1="15" x2="12" y2="3" />
       </svg>
       <span className="hidden sm:inline">PDF</span>
-    </a>
+    </button>
   );
 }
 
@@ -116,7 +171,7 @@ function DeleteButton({ invoiceId, onDelete }: { invoiceId: string; onDelete: ()
         showToast("Invoice berhasil dihapus", "success");
       } else {
         const data = await res.json();
-        showToast(data?.error || "Gagal menghapus", "error");
+        showToast(toErrorMessage(data, "Gagal menghapus"), "error");
       }
     } finally {
       setDeleting(false);
@@ -155,7 +210,11 @@ export default function InvoicesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<"last-updated" | "recently-added" | "old-to-new">("recently-added");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deletingAll, setDeletingAll] = useState(false);
@@ -166,22 +225,39 @@ export default function InvoicesPage() {
   const [detailCache, setDetailCache] = useState<Record<string, InvoiceDetail>>({});
   const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
 
-  async function fetchInvoices() {
-    try {
-      const res = await fetch("/api/invoices/list");
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to load");
-      setData(json.data || []);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error loading invoices");
-    } finally {
-      setLoading(false);
+  async function fetchInvoices(pageToFetch = page, search = debouncedSearch, sort = sortBy) {
+      try {
+        setLoading(true);
+        setPage(pageToFetch);
+        const params = new URLSearchParams({
+          page: String(pageToFetch),
+          limit: "10",
+          search,
+          sort,
+        });
+        const res = await fetch(`/api/invoices/list?${params.toString()}`);
+        const json = await res.json();
+        if (!res.ok) throw new Error(toErrorMessage(json, "Failed to load"));
+        setData(json.data || []);
+        setTotal(json.total ?? 0);
+        setTotalPages(json.totalPages ?? 1);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Error loading invoices");
+      } finally {
+        setLoading(false);
+      }
     }
-  }
+
+  // Load when search or sort changes (reset to page 1)
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   useEffect(() => {
-    fetchInvoices();
-  }, []);
+    fetchInvoices(1, debouncedSearch, sortBy);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch, sortBy]);
 
   // Toggle invoice detail showcase
   const toggleDetail = useCallback(async (invoiceId: string) => {
@@ -217,7 +293,7 @@ export default function InvoicesPage() {
     try {
       const res = await fetch("/api/invoices/delete-all?confirm=DELETE_ALL_INVOICES", { method: "DELETE" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Gagal menghapus");
+      if (!res.ok) throw new Error(toErrorMessage(json, "Gagal menghapus"));
       showToast(`Berhasil menghapus ${json.deletedCount} invoice`, "success");
       setShowDeleteAllModal(false);
       setDeleteConfirmText("");
@@ -229,30 +305,8 @@ export default function InvoicesPage() {
     }
   }
 
-  const filteredData = useMemo(() => {
-    let result = data;
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (inv) =>
-          inv.invoice_number.toLowerCase().includes(query) ||
-          inv.kepada_yth.toLowerCase().includes(query) ||
-          inv.tanggal.includes(query)
-      );
-    }
-    return [...result].sort((a, b) => {
-      switch (sortBy) {
-        case "last-updated":
-          return new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime();
-        case "recently-added":
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        case "old-to-new":
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        default:
-          return 0;
-      }
-    });
-  }, [data, searchQuery, sortBy]);
+  // Server-side search/sort/pagination: client just renders what the API returned.
+  const filteredData = data;
 
   if (loading) return <div className="p-6">Loading...</div>;
   if (error) return <div className="p-6">Error: {error}</div>;
@@ -303,7 +357,9 @@ export default function InvoicesPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl font-semibold">Invoices</h1>
-          <p className="text-sm text-zinc-400">History (latest 100)</p>
+          <p className="text-sm text-zinc-400">
+            {total} invoice{total !== 1 ? "s" : ""} &bull; page {page} of {totalPages}
+          </p>
         </div>
         <div className="flex gap-2">
           {data.length > 0 && (
@@ -361,10 +417,33 @@ export default function InvoicesPage() {
       </div>
 
       {/* Results count */}
-      {searchQuery && (
-        <p className="text-sm text-zinc-400 mb-3">
-          Found {filteredData.length} invoice{filteredData.length !== 1 ? "s" : ""}
-        </p>
+      <p className="text-sm text-zinc-400 mb-3">
+        {searchQuery
+          ? `Found ${total} invoice${total !== 1 ? "s" : ""}`
+          : `Showing ${data.length} of ${total}`}
+      </p>
+
+      {/* Pagination controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <button
+            onClick={() => fetchInvoices(page - 1, debouncedSearch, sortBy)}
+            disabled={page <= 1 || loading}
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Prev
+          </button>
+          <span className="text-sm text-zinc-400">
+            Halaman {page} / {totalPages}
+          </span>
+          <button
+            onClick={() => fetchInvoices(page + 1, debouncedSearch, sortBy)}
+            disabled={page >= totalPages || loading}
+            className="rounded-xl border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Next →
+          </button>
+        </div>
       )}
 
       <div className="space-y-3">
@@ -597,13 +676,10 @@ function InvoiceShowcase({ detail }: { detail: InvoiceDetail }) {
         >
           Edit Invoice
         </Link>
-        <a
-          href={`/api/invoices/${detail.id}/pdf`}
-          download={`invoice-${detail.invoice_number}.pdf`}
-          className="rounded-lg bg-amber-500/10 border border-amber-500/30 px-4 py-2 text-xs font-medium text-amber-400 hover:bg-amber-500/20 transition-colors"
-        >
-          Download PDF
-        </a>
+        <DownloadPdfButton
+          invoiceId={detail.id}
+          invoiceNumber={detail.invoice_number}
+        />
       </div>
     </div>
   );

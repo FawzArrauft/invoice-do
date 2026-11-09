@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { formatZodError } from "@/lib/apiError";
 
 const CargoSchema = z.object({
   truck_id: z.string().uuid(),
@@ -55,7 +56,7 @@ export async function POST(
     const parsed = CargoSchema.safeParse({ ...body, truck_id: id });
     
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+      return NextResponse.json({ error: formatZodError(parsed.error) }, { status: 400 });
     }
 
     const sb = supabaseServer();
